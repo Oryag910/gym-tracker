@@ -11,6 +11,7 @@ class User(Base):
     username = Column(String, unique=True, nullable=False, index=True)
     email = Column(String, unique=True, nullable=False, index=True)
     password_hash = Column(Text, nullable=False)
+    is_admin = Column(Boolean, default=False, nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow)
 
     workouts = relationship("Workout", back_populates="user", cascade="all, delete-orphan")
@@ -98,3 +99,19 @@ class CustomExercise(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
 
     user = relationship("User", backref="custom_exercises")
+
+
+class GlobalExercise(Base):
+    __tablename__ = "global_exercises"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    name = Column(String, nullable=False)
+    name_lower = Column(String, nullable=False, index=True)
+    category = Column(String, nullable=True)
+    image_url = Column(String, nullable=True)
+    muscles_primary = Column(Text, nullable=True)
+    muscles_secondary = Column(Text, nullable=True)
+    muscles_primary_ids = Column(Text, nullable=True)
+    muscles_secondary_ids = Column(Text, nullable=True)
+    description = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)

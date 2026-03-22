@@ -14,3 +14,6 @@ export const resetPassword = (token: string, new_password: string) =>
 
 export const forgotAccount = (email: string) =>
   client.post('/auth/forgot-account', { email })
+
+export const getMe = () =>
+  client.get<{ id: number; username: string; email: string; is_admin: boolean }>('/auth/me')

@@ -8,9 +8,10 @@ import logging
 from datetime import datetime, timedelta
 
 import httpx
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
-from api.models import CustomExercise, ExerciseCache
+from api.models import GlobalExercise, ExerciseCache
 
 logger = logging.getLogger(__name__)
 
@@ -137,28 +138,29 @@ async def _fetch_wger(name: str) -> dict:
 async def lookup_exercise(name: str, db: Session, user_id: int | None = None) -> dict:
     """
     Look up exercise info by name.
-    Priority: 1) user's custom library (exact match), 2) wger cache/fetch.
+    Priority: 1) global exercise library (fuzzy match), 2) wger cache/fetch.
     """
     key = _normalize(name)
 
-    # Priority 1: custom library (exact match)
-    if user_id is not None:
-        custom = db.query(CustomExercise).filter(
-            CustomExercise.user_id == user_id,
-            CustomExercise.name_lower == key,
-        ).first()
-        if custom:
-            return {
-                "canonical_name": custom.name,
-                "image_url": None,
-                "muscles_primary": json.loads(custom.muscles_primary or "[]"),
-                "muscles_secondary": json.loads(custom.muscles_secondary or "[]"),
-                "muscles_primary_ids": json.loads(custom.muscles_primary_ids or "[]"),
-                "muscles_secondary_ids": json.loads(custom.muscles_secondary_ids or "[]"),
-                "description": custom.description,
-                "category": custom.category,
-                "is_custom": True,
-            }
+    # Priority 1: global exercise library (fuzzy match, prefers shorter/closer names)
+    global_ex = (
+        db.query(GlobalExercise)
+        .filter(GlobalExercise.name_lower.contains(key))
+        .order_by(func.length(GlobalExercise.name_lower))
+        .first()
+    )
+    if global_ex:
+        return {
+            "canonical_name": global_ex.name,
+            "image_url": global_ex.image_url,
+            "muscles_primary": json.loads(global_ex.muscles_primary or "[]"),
+            "muscles_secondary": json.loads(global_ex.muscles_secondary or "[]"),
+            "muscles_primary_ids": json.loads(global_ex.muscles_primary_ids or "[]"),
+            "muscles_secondary_ids": json.loads(global_ex.muscles_secondary_ids or "[]"),
+            "description": global_ex.description,
+            "category": global_ex.category,
+            "is_custom": False,
+        }
 
     # Priority 2: wger cache — must be fresh AND have the new fields
     cached = db.query(ExerciseCache).filter(ExerciseCache.search_key == key).first()

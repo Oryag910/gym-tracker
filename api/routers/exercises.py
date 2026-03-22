@@ -16,5 +16,5 @@ async def lookup(
     db: Session = Depends(get_db),
 ):
     """Look up exercise info (image + muscles) by name. Results cached 30 days."""
-    result = await lookup_exercise(q, db, user_id=current_user.id)
+    result = await lookup_exercise(q, db)
     return result

@@ -38,6 +38,7 @@ class UserResponse(BaseModel):
     id: int
     username: str
     email: str
+    is_admin: bool = False
 
     class Config:
         from_attributes = True
@@ -160,6 +161,7 @@ class CompareResponse(BaseModel):
 class CustomExerciseCreate(BaseModel):
     name: str
     category: Optional[str] = None
+    image_url: Optional[str] = None
     muscles_primary_ids: List[int] = []
     muscles_secondary_ids: List[int] = []
     description: Optional[str] = None
@@ -168,6 +170,7 @@ class CustomExerciseCreate(BaseModel):
 class CustomExerciseUpdate(BaseModel):
     name: Optional[str] = None
     category: Optional[str] = None
+    image_url: Optional[str] = None
     muscles_primary_ids: Optional[List[int]] = None
     muscles_secondary_ids: Optional[List[int]] = None
     description: Optional[str] = None

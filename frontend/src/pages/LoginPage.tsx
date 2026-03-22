@@ -21,7 +21,7 @@ export default function LoginPage() {
     setLoading(true)
     try {
       const res = await authApi.login(username, password)
-      login(res.data.access_token)
+      await login(res.data.access_token)
       navigate('/')
     } catch (err: any) {
       setError(err.response?.data?.detail || 'Login failed')
@@ -37,7 +37,7 @@ export default function LoginPage() {
     try {
       await authApi.register(username, email, password)
       const res = await authApi.login(username, password)
-      login(res.data.access_token)
+      await login(res.data.access_token)
       navigate('/')
     } catch (err: any) {
       setError(err.response?.data?.detail || 'Registration failed')

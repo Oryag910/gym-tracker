@@ -7,7 +7,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from api.database import engine, Base
-from api.routers import auth, workouts, stats, exercises, custom_exercises
+from api.routers import auth, workouts, stats, exercises, global_exercises
 
 # Create all tables on startup (including exercise_cache)
 Base.metadata.create_all(bind=engine)
@@ -18,24 +18,33 @@ import logging
 from sqlalchemy import text as _text
 
 _log = logging.getLogger(__name__)
-_new_cols = [
-    ("muscles_primary_ids", "TEXT"),
-    ("muscles_secondary_ids", "TEXT"),
-    ("description", "TEXT"),
-    ("category", "VARCHAR"),
+_migrations = [
+    ("exercise_cache", "muscles_primary_ids", "TEXT"),
+    ("exercise_cache", "muscles_secondary_ids", "TEXT"),
+    ("exercise_cache", "description", "TEXT"),
+    ("exercise_cache", "category", "VARCHAR"),
+    ("users", "is_admin", "BOOLEAN DEFAULT FALSE"),
 ]
 with engine.connect() as _conn:
-    for _col, _type in _new_cols:
+    for _table, _col, _type in _migrations:
         try:
-            _conn.execute(_text(f"ALTER TABLE exercise_cache ADD COLUMN {_col} {_type}"))
+            _conn.execute(_text(f"ALTER TABLE {_table} ADD COLUMN {_col} {_type}"))
             _conn.commit()
-            _log.info("exercise_cache: added column %s", _col)
+            _log.info("%s: added column %s", _table, _col)
         except Exception as _e:
             _conn.rollback()
             if any(kw in str(_e).lower() for kw in ("duplicate", "already exists", "column")):
-                pass  # column already present — expected on subsequent deploys
+                pass
             else:
-                _log.warning("exercise_cache migration warning: %s", _e)
+                _log.warning("migration warning (%s.%s): %s", _table, _col, _e)
+
+# Ensure admin user has is_admin=True
+_admin_username = os.getenv("ADMIN_USERNAME", "")
+if _admin_username:
+    with engine.connect() as _conn:
+        _conn.execute(_text("UPDATE users SET is_admin = TRUE WHERE username = :u"), {"u": _admin_username})
+        _conn.commit()
+        _log.info("Admin flag set for user: %s", _admin_username)
 
 app = FastAPI(title="Gym Tracker API", version="1.0.0")
 
@@ -56,7 +65,7 @@ app.include_router(auth.router)
 app.include_router(workouts.router)
 app.include_router(stats.router)
 app.include_router(exercises.router)
-app.include_router(custom_exercises.router)
+app.include_router(global_exercises.router)
 
 
 @app.get("/health")

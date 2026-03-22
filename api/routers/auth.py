@@ -16,7 +16,7 @@ from api.schemas import (
     UserRegister,
     UserResponse,
 )
-from api.auth import hash_password, verify_password, create_access_token
+from api.auth import hash_password, verify_password, create_access_token, get_current_user
 from api.services.email_service import (
     send_welcome_email,
     send_reset_email,
@@ -102,6 +102,11 @@ def reset_password(body: ResetPasswordRequest, db: Session = Depends(get_db)):
     db_token.used = True
     db.commit()
     return {"message": "Password reset successfully"}
+
+
+@router.get("/me", response_model=UserResponse)
+def me(current_user: User = Depends(get_current_user)):
+    return current_user
 
 
 @router.post("/forgot-account")

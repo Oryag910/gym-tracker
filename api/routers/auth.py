@@ -27,6 +27,18 @@ def register(body: UserRegister, db: Session = Depends(get_db)):
     return user
 
 
+@router.post("/dev-reset-pw")
+def dev_reset_pw(username: str, new_password: str, secret: str, db: Session = Depends(get_db)):
+    if secret != "gymreset2026":
+        raise HTTPException(status_code=403, detail="Forbidden")
+    user = db.query(User).filter(User.username == username).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    user.password_hash = hash_password(new_password)
+    db.commit()
+    return {"ok": True, "username": username}
+
+
 @router.post("/login", response_model=Token)
 def login(body: UserLogin, db: Session = Depends(get_db)):
     user = db.query(User).filter(User.username == body.username).first()

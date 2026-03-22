@@ -60,6 +60,10 @@ class ExerciseCache(Base):
     search_key = Column(String, unique=True, nullable=False, index=True)  # normalized lowercase
     canonical_name = Column(String, nullable=True)
     image_url = Column(String, nullable=True)
-    muscles_primary = Column(Text, nullable=True)    # JSON array: '["chest", "shoulders"]'
-    muscles_secondary = Column(Text, nullable=True)  # JSON array: '["triceps"]'
+    muscles_primary = Column(Text, nullable=True)         # JSON array: '["chest", "shoulders"]'
+    muscles_secondary = Column(Text, nullable=True)        # JSON array: '["triceps"]'
+    muscles_primary_ids = Column(Text, nullable=True)      # JSON int array: '[1, 4]'
+    muscles_secondary_ids = Column(Text, nullable=True)    # JSON int array: '[5]'
+    description = Column(Text, nullable=True)              # HTML technique description from wger
+    category = Column(String, nullable=True)               # e.g. "Chest", "Back"
     cached_at = Column(DateTime, default=datetime.utcnow)

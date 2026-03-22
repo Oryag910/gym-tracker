@@ -75,6 +75,53 @@ function SetRow({ set, workoutId, exerciseId, onUpdated }: {
   )
 }
 
+function TechniquePanel({ description, category }: { description: string; category: string | null }) {
+  const [expanded, setExpanded] = useState(false)
+  const safe = description
+    .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
+    .replace(/\son\w+="[^"]*"/gi, '')
+
+  return (
+    <div className="mt-3 border-t border-slate-700 pt-3">
+      <button
+        type="button"
+        onClick={() => setExpanded(v => !v)}
+        className="flex items-center justify-between w-full text-left"
+      >
+        <div className="flex items-center gap-2">
+          <span className="text-xs font-medium text-slate-300">Technique</span>
+          {category && (
+            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-blue-500/10 text-blue-400 border border-blue-500/20">
+              {category}
+            </span>
+          )}
+        </div>
+        <svg
+          className={`w-4 h-4 text-slate-500 transition-transform ${expanded ? 'rotate-180' : ''}`}
+          fill="none" stroke="currentColor" viewBox="0 0 24 24"
+        >
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+        </svg>
+      </button>
+      <AnimatePresence>
+        {expanded && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            exit={{ opacity: 0, height: 0 }}
+            className="overflow-hidden"
+          >
+            <div
+              className="mt-2 text-xs text-slate-400 leading-relaxed space-y-1 [&_p]:mb-1 [&_ul]:list-disc [&_ul]:pl-4 [&_li]:mb-0.5"
+              dangerouslySetInnerHTML={{ __html: safe }}
+            />
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  )
+}
+
 function ExerciseCard({ exercise, workoutId, onUpdated }: {
   exercise: ExerciseResponse; workoutId: number; onUpdated: () => void
 }) {
@@ -121,7 +168,7 @@ function ExerciseCard({ exercise, workoutId, onUpdated }: {
         </button>
       </div>
 
-      {/* Muscle map */}
+      {/* Muscle map + technique */}
       <AnimatePresence>
         {showMuscles && lookup && (
           <motion.div
@@ -130,7 +177,15 @@ function ExerciseCard({ exercise, workoutId, onUpdated }: {
             exit={{ opacity: 0, height: 0 }}
             className="overflow-hidden mb-4"
           >
-            <MuscleMap primary={lookup.muscles_primary} secondary={lookup.muscles_secondary} />
+            <MuscleMap
+              primary={lookup.muscles_primary}
+              secondary={lookup.muscles_secondary}
+              primaryIds={lookup.muscles_primary_ids}
+              secondaryIds={lookup.muscles_secondary_ids}
+            />
+            {lookup.description && (
+              <TechniquePanel description={lookup.description} category={lookup.category} />
+            )}
           </motion.div>
         )}
       </AnimatePresence>

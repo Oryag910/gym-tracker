@@ -8,6 +8,53 @@ import MuscleMap from '../components/MuscleMap/MuscleMap'
 import { card, input, btnPrimary, btnGhost } from '../styles/tokens'
 import PageTransition from '../components/PageTransition'
 
+function LogTechniquePanel({ description, category }: { description: string; category: string | null }) {
+  const [expanded, setExpanded] = useState(false)
+  const safe = description
+    .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
+    .replace(/\son\w+="[^"]*"/gi, '')
+
+  return (
+    <div className="mt-3 border-t border-slate-700 pt-3">
+      <button
+        type="button"
+        onClick={() => setExpanded(v => !v)}
+        className="flex items-center justify-between w-full text-left"
+      >
+        <div className="flex items-center gap-2">
+          <span className="text-xs font-medium text-slate-300">Technique</span>
+          {category && (
+            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-blue-500/10 text-blue-400 border border-blue-500/20">
+              {category}
+            </span>
+          )}
+        </div>
+        <svg
+          className={`w-4 h-4 text-slate-500 transition-transform ${expanded ? 'rotate-180' : ''}`}
+          fill="none" stroke="currentColor" viewBox="0 0 24 24"
+        >
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+        </svg>
+      </button>
+      <AnimatePresence>
+        {expanded && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            exit={{ opacity: 0, height: 0 }}
+            className="overflow-hidden"
+          >
+            <div
+              className="mt-2 text-xs text-slate-400 leading-relaxed [&_p]:mb-1 [&_ul]:list-disc [&_ul]:pl-4 [&_li]:mb-0.5"
+              dangerouslySetInnerHTML={{ __html: safe }}
+            />
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  )
+}
+
 interface SetForm { weight: string; reps: string }
 interface ExerciseForm {
   name: string
@@ -176,7 +223,12 @@ export default function LogWorkoutPage() {
                       <MuscleMap
                         primary={ex.lookup.muscles_primary}
                         secondary={ex.lookup.muscles_secondary}
+                        primaryIds={ex.lookup.muscles_primary_ids}
+                        secondaryIds={ex.lookup.muscles_secondary_ids}
                       />
+                      {ex.lookup.description && (
+                        <LogTechniquePanel description={ex.lookup.description} category={ex.lookup.category} />
+                      )}
                     </motion.div>
                   )}
                 </AnimatePresence>

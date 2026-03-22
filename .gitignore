@@ -1,0 +1,12 @@
+venv/
+__pycache__/
+*.pyc
+*.pyo
+.env
+data/gym.db
+.DS_Store
+*.egg-info/
+
+frontend/node_modules/
+frontend/dist/
+frontend/.env.local

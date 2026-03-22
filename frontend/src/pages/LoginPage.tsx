@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { useAuth } from '../context/AuthContext'
 import * as authApi from '../api/auth'
@@ -122,6 +122,16 @@ export default function LoginPage() {
                 onChange={(e) => setPassword(e.target.value)}
                 required
               />
+              {tab === 'login' && (
+                <div className="flex justify-between mt-1.5">
+                  <Link to="/forgot-password" className="text-xs text-slate-600 hover:text-blue-400 transition-colors">
+                    Forgot password?
+                  </Link>
+                  <Link to="/forgot-password" className="text-xs text-slate-600 hover:text-blue-400 transition-colors">
+                    Forgot account?
+                  </Link>
+                </div>
+              )}
             </div>
 
             {error && (

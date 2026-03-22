@@ -85,6 +85,17 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           Compare
         </Link>
 
+        <Link
+          to="/library"
+          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm transition-colors ml-1 ${
+            isActive('/library')
+              ? 'bg-blue-500/10 text-blue-400 font-medium'
+              : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800'
+          }`}
+        >
+          Library
+        </Link>
+
         <button
           onClick={() => { logout(); navigate('/login') }}
           className="ml-auto text-slate-400 hover:text-slate-200 text-sm px-3 py-1.5 rounded-lg hover:bg-slate-800 transition-colors"

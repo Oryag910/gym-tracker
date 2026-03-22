@@ -10,7 +10,7 @@ from datetime import datetime, timedelta
 import httpx
 from sqlalchemy.orm import Session
 
-from api.models import ExerciseCache
+from api.models import CustomExercise, ExerciseCache
 
 logger = logging.getLogger(__name__)
 
@@ -134,14 +134,33 @@ async def _fetch_wger(name: str) -> dict:
         }
 
 
-async def lookup_exercise(name: str, db: Session) -> dict:
+async def lookup_exercise(name: str, db: Session, user_id: int | None = None) -> dict:
     """
-    Look up exercise info by name. Returns cached result if fresh and complete,
-    otherwise fetches from wger and caches.
+    Look up exercise info by name.
+    Priority: 1) user's custom library (exact match), 2) wger cache/fetch.
     """
     key = _normalize(name)
 
-    # Check cache — must be fresh AND have the new fields
+    # Priority 1: custom library (exact match)
+    if user_id is not None:
+        custom = db.query(CustomExercise).filter(
+            CustomExercise.user_id == user_id,
+            CustomExercise.name_lower == key,
+        ).first()
+        if custom:
+            return {
+                "canonical_name": custom.name,
+                "image_url": None,
+                "muscles_primary": json.loads(custom.muscles_primary or "[]"),
+                "muscles_secondary": json.loads(custom.muscles_secondary or "[]"),
+                "muscles_primary_ids": json.loads(custom.muscles_primary_ids or "[]"),
+                "muscles_secondary_ids": json.loads(custom.muscles_secondary_ids or "[]"),
+                "description": custom.description,
+                "category": custom.category,
+                "is_custom": True,
+            }
+
+    # Priority 2: wger cache — must be fresh AND have the new fields
     cached = db.query(ExerciseCache).filter(ExerciseCache.search_key == key).first()
     if cached and _is_fresh(cached.cached_at) and _is_complete(cached):
         return {

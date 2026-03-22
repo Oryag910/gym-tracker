@@ -1,9 +1,22 @@
 from datetime import date
-from typing import Optional
+from typing import Optional, List
 from pydantic import BaseModel
 
 
 # --- Auth ---
+
+class ForgotPasswordRequest(BaseModel):
+    email: str
+
+
+class ResetPasswordRequest(BaseModel):
+    token: str
+    new_password: str
+
+
+class ForgotAccountRequest(BaseModel):
+    email: str
+
 
 class UserRegister(BaseModel):
     username: str
@@ -140,3 +153,35 @@ class CompareResponse(BaseModel):
     workout_a: WorkoutSummary
     workout_b: WorkoutSummary
     exercises: list[ExerciseCompare]
+
+
+# --- Custom Exercise Library ---
+
+class CustomExerciseCreate(BaseModel):
+    name: str
+    category: Optional[str] = None
+    muscles_primary_ids: List[int] = []
+    muscles_secondary_ids: List[int] = []
+    description: Optional[str] = None
+
+
+class CustomExerciseUpdate(BaseModel):
+    name: Optional[str] = None
+    category: Optional[str] = None
+    muscles_primary_ids: Optional[List[int]] = None
+    muscles_secondary_ids: Optional[List[int]] = None
+    description: Optional[str] = None
+
+
+class CustomExerciseResponse(BaseModel):
+    id: int
+    name: str
+    category: Optional[str]
+    muscles_primary: List[str]
+    muscles_secondary: List[str]
+    muscles_primary_ids: List[int]
+    muscles_secondary_ids: List[int]
+    description: Optional[str]
+
+    class Config:
+        from_attributes = True

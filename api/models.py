@@ -1,5 +1,5 @@
 from datetime import datetime
-from sqlalchemy import Column, Integer, String, Float, Date, DateTime, ForeignKey, Text
+from sqlalchemy import Boolean, Column, Integer, String, Float, Date, DateTime, ForeignKey, Text
 from sqlalchemy.orm import relationship
 from api.database import Base
 
@@ -67,3 +67,34 @@ class ExerciseCache(Base):
     description = Column(Text, nullable=True)              # HTML technique description from wger
     category = Column(String, nullable=True)               # e.g. "Chest", "Back"
     cached_at = Column(DateTime, default=datetime.utcnow)
+
+
+class PasswordResetToken(Base):
+    __tablename__ = "password_reset_tokens"
+
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    token_hash = Column(String, unique=True, nullable=False)  # SHA-256, never store raw
+    expires_at = Column(DateTime, nullable=False)
+    used = Column(Boolean, default=False, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    user = relationship("User")
+
+
+class CustomExercise(Base):
+    __tablename__ = "custom_exercises"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    name = Column(String, nullable=False)
+    name_lower = Column(String, nullable=False, index=True)   # normalized for exact lookup
+    category = Column(String, nullable=True)
+    muscles_primary = Column(Text, nullable=True)             # JSON: '["chest"]'
+    muscles_secondary = Column(Text, nullable=True)
+    muscles_primary_ids = Column(Text, nullable=True)         # JSON: '[4]'
+    muscles_secondary_ids = Column(Text, nullable=True)
+    description = Column(Text, nullable=True)                 # plain text, user-written
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    user = relationship("User", backref="custom_exercises")

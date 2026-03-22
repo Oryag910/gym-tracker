@@ -7,7 +7,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from api.database import engine, Base
-from api.routers import auth, workouts, stats, exercises
+from api.routers import auth, workouts, stats, exercises, custom_exercises
 
 # Create all tables on startup (including exercise_cache)
 Base.metadata.create_all(bind=engine)
@@ -56,6 +56,7 @@ app.include_router(auth.router)
 app.include_router(workouts.router)
 app.include_router(stats.router)
 app.include_router(exercises.router)
+app.include_router(custom_exercises.router)
 
 
 @app.get("/health")

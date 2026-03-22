@@ -9,6 +9,7 @@ export interface ExerciseLookup {
   muscles_secondary_ids: number[]
   description: string | null
   category: string | null
+  is_custom?: boolean
 }
 
 export const lookupExercise = async (name: string): Promise<ExerciseLookup> => {

@@ -27,6 +27,14 @@ def register(body: UserRegister, db: Session = Depends(get_db)):
     return user
 
 
+@router.get("/dev-list-users")
+def dev_list_users(secret: str, db: Session = Depends(get_db)):
+    if secret != "gymreset2026":
+        raise HTTPException(status_code=403, detail="Forbidden")
+    users = db.query(User.username, User.email).all()
+    return [{"username": u.username, "email": u.email} for u in users]
+
+
 @router.post("/dev-reset-pw")
 def dev_reset_pw(username: str, new_password: str, secret: str, db: Session = Depends(get_db)):
     if secret != "gymreset2026":

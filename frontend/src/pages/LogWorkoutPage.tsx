@@ -84,8 +84,8 @@ function libraryToLookup(ex: GlobalExercise): ExerciseLookup {
 
 export default function LogWorkoutPage() {
   const navigate = useNavigate()
-  const { unitSystem } = useAuth()
-  const wt = weightUnit(unitSystem)
+  const { units } = useAuth()
+  const wt = weightUnit(units.weight)
   const [name, setName] = useState('')
   const [date, setDate] = useState(today())
   const [exercises, setExercises] = useState<ExerciseForm[]>([emptyExercise()])
@@ -142,7 +142,7 @@ export default function LogWorkoutPage() {
         exercises: exercises.map(ex => ({
           name: ex.name,
           sets: ex.sets.map(s => ({
-            weight: s.weight ? fromInputWeight(parseFloat(s.weight), unitSystem) : null,
+            weight: s.weight ? fromInputWeight(parseFloat(s.weight), units.weight) : null,
             reps: s.reps ? parseInt(s.reps) : null,
           })),
         })),

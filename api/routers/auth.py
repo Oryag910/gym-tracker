@@ -116,10 +116,29 @@ def update_preferences(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    if body.unit_system not in ("imperial", "metric"):
-        from fastapi import HTTPException
+    from fastapi import HTTPException
+    if body.unit_system is not None and body.unit_system not in ("imperial", "metric"):
         raise HTTPException(status_code=400, detail="unit_system must be 'imperial' or 'metric'")
-    current_user.unit_system = body.unit_system
+    if body.pref_weight is not None and body.pref_weight not in ("lbs", "kg"):
+        raise HTTPException(status_code=400, detail="pref_weight must be 'lbs' or 'kg'")
+    if body.pref_distance is not None and body.pref_distance not in ("km", "mi"):
+        raise HTTPException(status_code=400, detail="pref_distance must be 'km' or 'mi'")
+    if body.pref_measure is not None and body.pref_measure not in ("cm", "in"):
+        raise HTTPException(status_code=400, detail="pref_measure must be 'cm' or 'in'")
+    if body.pref_temp is not None and body.pref_temp not in ("c", "f"):
+        raise HTTPException(status_code=400, detail="pref_temp must be 'c' or 'f'")
+
+    if body.unit_system is not None:
+        current_user.unit_system = body.unit_system
+    if body.pref_weight is not None:
+        current_user.pref_weight = body.pref_weight
+    if body.pref_distance is not None:
+        current_user.pref_distance = body.pref_distance
+    if body.pref_measure is not None:
+        current_user.pref_measure = body.pref_measure
+    if body.pref_temp is not None:
+        current_user.pref_temp = body.pref_temp
+
     db.commit()
     db.refresh(current_user)
     return current_user

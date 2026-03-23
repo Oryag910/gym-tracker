@@ -187,7 +187,7 @@ function cutoffDate(days: number): Date {
 // ─── Main Component ───────────────────────────────────────────────────────────
 
 export default function AnalyticsPage() {
-  const { unitSystem } = useAuth()
+  const { units } = useAuth()
   const [tab, setTab] = useState<Tab>('volume')
   const [library, setLibrary] = useState<GlobalExercise[]>([])
 
@@ -229,9 +229,9 @@ export default function AnalyticsPage() {
   const [cardioMetric, setCardioMetric] = useState<CardioMetric>('distance')
   const [cardioRange, setCardioRange] = useState(30)
 
-  const wt = weightUnit(unitSystem)
-  const du = distanceUnit(unitSystem)
-  const mt = measureUnit(unitSystem)
+  const wt = weightUnit(units.weight)
+  const du = distanceUnit(units.distance)
+  const mt = measureUnit(units.measure)
 
   useEffect(() => {
     Promise.all([
@@ -289,8 +289,8 @@ export default function AnalyticsPage() {
     .map(m => {
       const raw = m[measureField] as number
       let val = raw
-      if (measureField === 'weight') val = toDisplayWeight(raw, unitSystem)
-      else if (measureField !== 'body_fat') val = toDisplayMeasure(raw, unitSystem)
+      if (measureField === 'weight') val = toDisplayWeight(raw, units.weight)
+      else if (measureField !== 'body_fat') val = toDisplayMeasure(raw, units.measure)
       return { date: m.date, value: +val.toFixed(2) }
     })
 
@@ -300,7 +300,7 @@ export default function AnalyticsPage() {
     .filter(s => cardioActivity === 'all' || s.activity_type === cardioActivity)
     .map(s => {
       let val: number | null = null
-      if (cardioMetric === 'distance') val = s.total_distance != null ? +toDisplayDistance(s.total_distance, unitSystem).toFixed(2) : null
+      if (cardioMetric === 'distance') val = s.total_distance != null ? +toDisplayDistance(s.total_distance, units.distance).toFixed(2) : null
       if (cardioMetric === 'duration') val = s.total_duration
       if (cardioMetric === 'avg_hr') val = s.avg_hr
       return { date: s.date, value: val, name: s.name }
@@ -349,7 +349,7 @@ export default function AnalyticsPage() {
               <p className="text-slate-500 text-center py-10">No data yet.</p>
             ) : (
               <ResponsiveContainer width="100%" height={260}>
-                <AreaChart data={volume.map(v => ({ date: v.date, volume: Math.round(toDisplayWeight(v.volume, unitSystem)), name: v.workout_name }))}>
+                <AreaChart data={volume.map(v => ({ date: v.date, volume: Math.round(toDisplayWeight(v.volume, units.weight)), name: v.workout_name }))}>
                   <defs>
                     <linearGradient id="volGrad" x1="0" y1="0" x2="0" y2="1">
                       <stop offset="5%" stopColor="#34d399" stopOpacity={0.35} />

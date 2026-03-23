@@ -15,10 +15,15 @@ class User(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
 
     unit_system = Column(String, nullable=False, default="imperial")  # 'imperial' | 'metric'
+    pref_weight   = Column(String, nullable=True)   # 'lbs' | 'kg'   — overrides unit_system if set
+    pref_distance = Column(String, nullable=True)   # 'km'  | 'mi'
+    pref_measure  = Column(String, nullable=True)   # 'cm'  | 'in'
+    pref_temp     = Column(String, nullable=True)   # 'c'   | 'f'
 
     workouts = relationship("Workout", back_populates="user", cascade="all, delete-orphan")
     measurements = relationship("Measurement", back_populates="user", cascade="all, delete-orphan")
     cardio_sessions = relationship("CardioSession", back_populates="user", cascade="all, delete-orphan")
+    workout_templates = relationship("WorkoutTemplate", back_populates="user", cascade="all, delete-orphan")
 
 
 class Workout(Base):
@@ -178,3 +183,54 @@ class CardioSegment(Base):
     notes = Column(Text, nullable=True)
 
     session = relationship("CardioSession", back_populates="segments")
+
+
+class WorkoutTemplate(Base):
+    __tablename__ = "workout_templates"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    name = Column(String, nullable=False)
+    description = Column(Text, nullable=True)
+    default_set_rest = Column(Integer, nullable=False, default=90)       # seconds between sets
+    default_exercise_rest = Column(Integer, nullable=False, default=120) # seconds between exercises
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    user = relationship("User", back_populates="workout_templates")
+    exercises = relationship(
+        "TemplateExercise",
+        back_populates="template",
+        cascade="all, delete-orphan",
+        order_by="TemplateExercise.order_index",
+    )
+
+
+class TemplateExercise(Base):
+    __tablename__ = "template_exercises"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    template_id = Column(Integer, ForeignKey("workout_templates.id", ondelete="CASCADE"), nullable=False)
+    name = Column(String, nullable=False)
+    order_index = Column(Integer, nullable=False, default=0)
+    set_rest_override = Column(Integer, nullable=True)       # seconds; overrides template default if set
+    exercise_rest_override = Column(Integer, nullable=True)  # seconds; overrides template default if set
+
+    template = relationship("WorkoutTemplate", back_populates="exercises")
+    sets = relationship(
+        "TemplateSet",
+        back_populates="exercise",
+        cascade="all, delete-orphan",
+        order_by="TemplateSet.set_number",
+    )
+
+
+class TemplateSet(Base):
+    __tablename__ = "template_sets"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    exercise_id = Column(Integer, ForeignKey("template_exercises.id", ondelete="CASCADE"), nullable=False)
+    set_number = Column(Integer, nullable=False)
+    target_weight = Column(Float, nullable=True)  # lbs; null = bodyweight
+    target_reps = Column(Integer, nullable=True)  # null = no rep target
+
+    exercise = relationship("TemplateExercise", back_populates="sets")

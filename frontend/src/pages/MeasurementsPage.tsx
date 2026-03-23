@@ -13,7 +13,7 @@ import PageTransition from '../components/PageTransition'
 const today = () => new Date().toISOString().split('T')[0]
 
 export default function MeasurementsPage() {
-  const { unitSystem } = useAuth()
+  const { units } = useAuth()
   const [entries, setEntries] = useState<MeasurementEntry[]>([])
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -44,14 +44,14 @@ export default function MeasurementsPage() {
     try {
       await createMeasurement({
         date,
-        weight: weight ? fromInputWeight(parseFloat(weight), unitSystem) : null,
+        weight: weight ? fromInputWeight(parseFloat(weight), units.weight) : null,
         body_fat: bodyFat ? parseFloat(bodyFat) : null,
-        chest: chest ? fromInputMeasure(parseFloat(chest), unitSystem) : null,
-        waist: waist ? fromInputMeasure(parseFloat(waist), unitSystem) : null,
-        hips: hips ? fromInputMeasure(parseFloat(hips), unitSystem) : null,
-        arms: arms ? fromInputMeasure(parseFloat(arms), unitSystem) : null,
-        thighs: thighs ? fromInputMeasure(parseFloat(thighs), unitSystem) : null,
-        neck: neck ? fromInputMeasure(parseFloat(neck), unitSystem) : null,
+        chest: chest ? fromInputMeasure(parseFloat(chest), units.measure) : null,
+        waist: waist ? fromInputMeasure(parseFloat(waist), units.measure) : null,
+        hips: hips ? fromInputMeasure(parseFloat(hips), units.measure) : null,
+        arms: arms ? fromInputMeasure(parseFloat(arms), units.measure) : null,
+        thighs: thighs ? fromInputMeasure(parseFloat(thighs), units.measure) : null,
+        neck: neck ? fromInputMeasure(parseFloat(neck), units.measure) : null,
         notes: notes || null,
       })
       setWeight(''); setBodyFat(''); setChest(''); setWaist('')
@@ -70,8 +70,8 @@ export default function MeasurementsPage() {
     setEntries(prev => prev.filter(e => e.id !== id))
   }
 
-  const wt = weightUnit(unitSystem)
-  const mt = measureUnit(unitSystem)
+  const wt = weightUnit(units.weight)
+  const mt = measureUnit(units.measure)
 
   const fieldInput = (label_: string, value: string, setter: (v: string) => void, unit: string) => (
     <div>
@@ -158,7 +158,7 @@ export default function MeasurementsPage() {
                     <div className="flex flex-wrap gap-3 mt-1">
                       {e.weight != null && (
                         <span className="text-slate-100 font-semibold">
-                          {toDisplayWeight(e.weight, unitSystem)} {wt}
+                          {toDisplayWeight(e.weight, units.weight)} {wt}
                         </span>
                       )}
                       {e.body_fat != null && (
@@ -172,12 +172,12 @@ export default function MeasurementsPage() {
                 </div>
                 {(e.chest || e.waist || e.hips || e.arms || e.thighs || e.neck) && (
                   <div className="flex flex-wrap gap-x-4 gap-y-1 mt-2 text-xs text-slate-400">
-                    {e.chest != null && <span>Chest: {toDisplayMeasure(e.chest, unitSystem)}{mt}</span>}
-                    {e.waist != null && <span>Waist: {toDisplayMeasure(e.waist, unitSystem)}{mt}</span>}
-                    {e.hips != null && <span>Hips: {toDisplayMeasure(e.hips, unitSystem)}{mt}</span>}
-                    {e.arms != null && <span>Arms: {toDisplayMeasure(e.arms, unitSystem)}{mt}</span>}
-                    {e.thighs != null && <span>Thighs: {toDisplayMeasure(e.thighs, unitSystem)}{mt}</span>}
-                    {e.neck != null && <span>Neck: {toDisplayMeasure(e.neck, unitSystem)}{mt}</span>}
+                    {e.chest != null && <span>Chest: {toDisplayMeasure(e.chest, units.measure)}{mt}</span>}
+                    {e.waist != null && <span>Waist: {toDisplayMeasure(e.waist, units.measure)}{mt}</span>}
+                    {e.hips != null && <span>Hips: {toDisplayMeasure(e.hips, units.measure)}{mt}</span>}
+                    {e.arms != null && <span>Arms: {toDisplayMeasure(e.arms, units.measure)}{mt}</span>}
+                    {e.thighs != null && <span>Thighs: {toDisplayMeasure(e.thighs, units.measure)}{mt}</span>}
+                    {e.neck != null && <span>Neck: {toDisplayMeasure(e.neck, units.measure)}{mt}</span>}
                   </div>
                 )}
                 {e.notes && <p className="text-slate-500 text-xs mt-2">{e.notes}</p>}

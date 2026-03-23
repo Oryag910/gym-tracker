@@ -55,7 +55,7 @@ const emptySegment = (): SegmentForm => ({
 
 export default function LogCardioPage() {
   const navigate = useNavigate()
-  const { unitSystem } = useAuth()
+  const { units } = useAuth()
 
   const [name, setName] = useState('')
   const [date, setDate] = useState(today())
@@ -71,9 +71,9 @@ export default function LogCardioPage() {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
 
-  const du = distanceUnit(unitSystem)
-  const pu = paceUnit(unitSystem)
-  const tu = tempUnit(unitSystem)
+  const du = distanceUnit(units.distance)
+  const pu = paceUnit(units.distance)
+  const tu = tempUnit(units.temp)
 
   const addSegment = () => setSegments(prev => [...prev, emptySegment()])
   const removeSegment = (i: number) => setSegments(prev => prev.filter((_, idx) => idx !== i))
@@ -86,12 +86,12 @@ export default function LogCardioPage() {
     setSaving(true)
     try {
       const parsedSegments: CardioSegmentCreate[] = segments.map((s, i) => {
-        const pace = s.paceStr ? parsePace(s.paceStr, unitSystem) : undefined
+        const pace = s.paceStr ? parsePace(s.paceStr, units.distance) : undefined
         return {
           sort_order: i,
           segment_type: s.segment_type,
           label: s.label || undefined,
-          distance: s.distance ? fromInputDistance(parseFloat(s.distance), unitSystem) : undefined,
+          distance: s.distance ? fromInputDistance(parseFloat(s.distance), units.distance) : undefined,
           pace: pace ?? undefined,
           duration: s.duration ? parseFloat(s.duration) : undefined,
           hr: s.hr ? parseInt(s.hr) : undefined,
@@ -102,12 +102,12 @@ export default function LogCardioPage() {
 
       const res = await createCardioSession({
         date, name, activity_type: activityType,
-        total_distance: totalDistance ? fromInputDistance(parseFloat(totalDistance), unitSystem) : undefined,
+        total_distance: totalDistance ? fromInputDistance(parseFloat(totalDistance), units.distance) : undefined,
         total_duration: totalDuration ? parseFloat(totalDuration) : undefined,
         avg_hr: avgHr ? parseInt(avgHr) : undefined,
         max_hr: maxHr ? parseInt(maxHr) : undefined,
         calories: calories ? parseInt(calories) : undefined,
-        temperature: temperature ? fromInputTemp(parseFloat(temperature), unitSystem) : undefined,
+        temperature: temperature ? fromInputTemp(parseFloat(temperature), units.temp) : undefined,
         notes: notes || undefined,
         segments: parsedSegments,
       })

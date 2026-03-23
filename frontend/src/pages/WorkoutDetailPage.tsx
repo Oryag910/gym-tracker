@@ -211,7 +211,8 @@ function ExerciseCard({ exercise, workoutId, onUpdated, unitSystem }: {
 export default function WorkoutDetailPage() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
-  const { unitSystem } = useAuth()
+  const { units } = useAuth()
+  const unitSystem = units.weight
   const [workout, setWorkout] = useState<WorkoutDetail | null>(null)
   const [showDeleteModal, setShowDeleteModal] = useState(false)
   const [deleting, setDeleting] = useState(false)

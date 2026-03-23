@@ -40,13 +40,21 @@ class UserResponse(BaseModel):
     email: str
     is_admin: bool = False
     unit_system: str = "imperial"
+    pref_weight: Optional[str] = None
+    pref_distance: Optional[str] = None
+    pref_measure: Optional[str] = None
+    pref_temp: Optional[str] = None
 
     class Config:
         from_attributes = True
 
 
 class UserPreferencesUpdate(BaseModel):
-    unit_system: str  # 'imperial' | 'metric'
+    unit_system: Optional[str] = None   # 'imperial' | 'metric'
+    pref_weight: Optional[str] = None   # 'lbs' | 'kg'
+    pref_distance: Optional[str] = None # 'km' | 'mi'
+    pref_measure: Optional[str] = None  # 'cm' | 'in'
+    pref_temp: Optional[str] = None     # 'c' | 'f'
 
 
 # --- Sets ---
@@ -263,6 +271,84 @@ class CardioSessionResponse(BaseModel):
     temperature: Optional[float]
     notes: Optional[str]
     segments: List[CardioSegmentResponse]
+
+    class Config:
+        from_attributes = True
+
+
+# --- Workout Templates ---
+
+class TemplateSetCreate(BaseModel):
+    set_number: int
+    target_weight: Optional[float] = None  # lbs
+    target_reps: Optional[int] = None
+
+
+class TemplateSetResponse(BaseModel):
+    id: int
+    set_number: int
+    target_weight: Optional[float]
+    target_reps: Optional[int]
+
+    class Config:
+        from_attributes = True
+
+
+class TemplateExerciseCreate(BaseModel):
+    name: str
+    order_index: int = 0
+    set_rest_override: Optional[int] = None
+    exercise_rest_override: Optional[int] = None
+    sets: List[TemplateSetCreate]
+
+
+class TemplateExerciseResponse(BaseModel):
+    id: int
+    name: str
+    order_index: int
+    set_rest_override: Optional[int]
+    exercise_rest_override: Optional[int]
+    sets: List[TemplateSetResponse]
+
+    class Config:
+        from_attributes = True
+
+
+class TemplateCreate(BaseModel):
+    name: str
+    description: Optional[str] = None
+    default_set_rest: int = 90
+    default_exercise_rest: int = 120
+    exercises: List[TemplateExerciseCreate]
+
+
+class TemplateUpdate(BaseModel):
+    name: Optional[str] = None
+    description: Optional[str] = None
+    default_set_rest: Optional[int] = None
+    default_exercise_rest: Optional[int] = None
+    exercises: Optional[List[TemplateExerciseCreate]] = None
+
+
+class TemplateSummary(BaseModel):
+    id: int
+    name: str
+    description: Optional[str]
+    default_set_rest: int
+    default_exercise_rest: int
+    exercise_count: int
+
+    class Config:
+        from_attributes = True
+
+
+class TemplateResponse(BaseModel):
+    id: int
+    name: str
+    description: Optional[str]
+    default_set_rest: int
+    default_exercise_rest: int
+    exercises: List[TemplateExerciseResponse]
 
     class Config:
         from_attributes = True

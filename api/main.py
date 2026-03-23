@@ -7,7 +7,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from api.database import engine, Base
-from api.routers import auth, workouts, stats, exercises, global_exercises, measurements, cardio
+from api.routers import auth, workouts, stats, exercises, global_exercises, measurements, cardio, templates
 
 # Create all tables on startup (including exercise_cache)
 Base.metadata.create_all(bind=engine)
@@ -25,6 +25,10 @@ _migrations = [
     ("exercise_cache", "category", "VARCHAR"),
     ("users", "is_admin", "BOOLEAN DEFAULT FALSE"),
     ("users", "unit_system", "VARCHAR DEFAULT 'imperial'"),
+    ("users", "pref_weight",   "VARCHAR"),
+    ("users", "pref_distance", "VARCHAR"),
+    ("users", "pref_measure",  "VARCHAR"),
+    ("users", "pref_temp",     "VARCHAR"),
 ]
 with engine.connect() as _conn:
     for _table, _col, _type in _migrations:
@@ -69,6 +73,7 @@ app.include_router(exercises.router)
 app.include_router(global_exercises.router)
 app.include_router(measurements.router)
 app.include_router(cardio.router)
+app.include_router(templates.router)
 
 
 @app.get("/health")

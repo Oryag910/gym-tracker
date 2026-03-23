@@ -18,6 +18,9 @@ import CardioPage from './pages/CardioPage'
 import LogCardioPage from './pages/LogCardioPage'
 import CardioDetailPage from './pages/CardioDetailPage'
 import SettingsPage from './pages/SettingsPage'
+import TemplatesPage from './pages/TemplatesPage'
+import TemplateFormPage from './pages/TemplateFormPage'
+import GuidedWorkoutPage from './pages/GuidedWorkoutPage'
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated } = useAuth()
@@ -47,6 +50,10 @@ function AppRoutes() {
         <Route path="/cardio/log" element={<ProtectedRoute><Layout><LogCardioPage /></Layout></ProtectedRoute>} />
         <Route path="/cardio/:id" element={<ProtectedRoute><Layout><CardioDetailPage /></Layout></ProtectedRoute>} />
         <Route path="/settings" element={<ProtectedRoute><Layout><SettingsPage /></Layout></ProtectedRoute>} />
+        <Route path="/templates" element={<ProtectedRoute><Layout><TemplatesPage /></Layout></ProtectedRoute>} />
+        <Route path="/templates/new" element={<ProtectedRoute><Layout><TemplateFormPage /></Layout></ProtectedRoute>} />
+        <Route path="/templates/:id" element={<ProtectedRoute><Layout><TemplateFormPage /></Layout></ProtectedRoute>} />
+        <Route path="/workout/guided/:templateId" element={<ProtectedRoute><Layout><GuidedWorkoutPage /></Layout></ProtectedRoute>} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </AnimatePresence>

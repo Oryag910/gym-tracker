@@ -95,6 +95,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         </Link>
 
         {navLink('/cardio', 'Cardio', <RunIcon />)}
+        {navLink('/templates', 'Templates')}
         {navLink('/measurements', 'Measurements', <HeartIcon />)}
         {navLink('/library', 'Library')}
         {navLink('/settings', 'Settings')}

@@ -77,7 +77,7 @@ function SegmentRow({ seg, unitSystem }: { seg: CardioSegment; unitSystem: strin
 export default function CardioDetailPage() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
-  const { unitSystem } = useAuth()
+  const { units } = useAuth()
   const [session, setSession] = useState<CardioSessionDetail | null>(null)
   const [showDeleteModal, setShowDeleteModal] = useState(false)
   const [deleting, setDeleting] = useState(false)
@@ -92,8 +92,8 @@ export default function CardioDetailPage() {
     navigate('/cardio')
   }
 
-  const du = distanceUnit(unitSystem)
-  const tu = tempUnit(unitSystem)
+  const du = distanceUnit(units.distance)
+  const tu = tempUnit(units.temp)
 
   if (!session) return (
     <div className="space-y-4">
@@ -131,7 +131,7 @@ export default function CardioDetailPage() {
               <div>
                 <div className="text-xs text-slate-500 uppercase tracking-wide">Distance</div>
                 <div className="text-lg font-bold text-slate-100">
-                  {toDisplayDistance(session.total_distance, unitSystem)} {du}
+                  {toDisplayDistance(session.total_distance, units.distance)} {du}
                 </div>
               </div>
             )}
@@ -163,7 +163,7 @@ export default function CardioDetailPage() {
               <div>
                 <div className="text-xs text-slate-500 uppercase tracking-wide">Temp</div>
                 <div className="text-lg font-bold text-slate-100">
-                  {toDisplayTemp(session.temperature, unitSystem)}{tu}
+                  {toDisplayTemp(session.temperature, units.temp)}{tu}
                 </div>
               </div>
             )}
@@ -177,7 +177,7 @@ export default function CardioDetailPage() {
             <h2 className="font-semibold text-slate-200 mb-3">Segments</h2>
             <div className="space-y-2">
               {session.segments.map(seg => (
-                <SegmentRow key={seg.id} seg={seg} unitSystem={unitSystem} />
+                <SegmentRow key={seg.id} seg={seg} unitSystem={units.distance} />
               ))}
             </div>
           </div>

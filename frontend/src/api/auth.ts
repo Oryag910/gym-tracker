@@ -1,5 +1,17 @@
 import client from './client'
 
+export interface UserResponse {
+  id: number
+  username: string
+  email: string
+  is_admin: boolean
+  unit_system: string
+  pref_weight: string | null
+  pref_distance: string | null
+  pref_measure: string | null
+  pref_temp: string | null
+}
+
 export const register = (username: string, email: string, password: string) =>
   client.post('/auth/register', { username, email, password })
 
@@ -16,9 +28,13 @@ export const forgotAccount = (email: string) =>
   client.post('/auth/forgot-account', { email })
 
 export const getMe = () =>
-  client.get<{ id: number; username: string; email: string; is_admin: boolean; unit_system: string }>('/auth/me')
+  client.get<UserResponse>('/auth/me')
 
-export const updatePreferences = (unit_system: string) =>
-  client.patch<{ id: number; username: string; email: string; is_admin: boolean; unit_system: string }>(
-    '/auth/me/preferences', { unit_system }
-  )
+export const updatePreferences = (prefs: {
+  unit_system?: string
+  pref_weight?: string
+  pref_distance?: string
+  pref_measure?: string
+  pref_temp?: string
+}) =>
+  client.patch<UserResponse>('/auth/me/preferences', prefs)

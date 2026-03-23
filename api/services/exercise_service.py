@@ -151,13 +151,15 @@ async def lookup_exercise(name: str, db: Session, user_id: int | None = None) ->
         .first()
     )
     if global_ex:
+        pri_ids = json.loads(global_ex.muscles_primary_ids or "[]")
+        sec_ids = json.loads(global_ex.muscles_secondary_ids or "[]")
         return {
             "canonical_name": global_ex.name,
             "image_url": global_ex.image_url,
-            "muscles_primary": json.loads(global_ex.muscles_primary or "[]"),
-            "muscles_secondary": json.loads(global_ex.muscles_secondary or "[]"),
-            "muscles_primary_ids": json.loads(global_ex.muscles_primary_ids or "[]"),
-            "muscles_secondary_ids": json.loads(global_ex.muscles_secondary_ids or "[]"),
+            "muscles_primary": list(dict.fromkeys(MUSCLE_MAP[i] for i in pri_ids if i in MUSCLE_MAP)),
+            "muscles_secondary": list(dict.fromkeys(MUSCLE_MAP[i] for i in sec_ids if i in MUSCLE_MAP)),
+            "muscles_primary_ids": pri_ids,
+            "muscles_secondary_ids": sec_ids,
             "description": global_ex.description,
             "category": global_ex.category,
             "is_custom": False,
@@ -168,7 +170,7 @@ async def lookup_exercise(name: str, db: Session, user_id: int | None = None) ->
     if cached and _is_fresh(cached.cached_at) and _is_complete(cached):
         return {
             "canonical_name": cached.canonical_name,
-            "image_url": cached.image_url,
+            "image_url": None,  # images only shown for library exercises set by admin
             "muscles_primary": json.loads(cached.muscles_primary or "[]"),
             "muscles_secondary": json.loads(cached.muscles_secondary or "[]"),
             "muscles_primary_ids": json.loads(cached.muscles_primary_ids or "[]"),
@@ -218,7 +220,7 @@ async def lookup_exercise(name: str, db: Session, user_id: int | None = None) ->
 
     return {
         "canonical_name": data.get("canonical_name"),
-        "image_url": data.get("image_url"),
+        "image_url": None,  # images only shown for library exercises set by admin
         "muscles_primary": muscles_primary,
         "muscles_secondary": muscles_secondary,
         "muscles_primary_ids": muscles_primary_ids,

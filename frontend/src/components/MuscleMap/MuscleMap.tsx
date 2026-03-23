@@ -16,10 +16,10 @@ interface Props {
 }
 
 // wger static images — self-hosted in /public/muscles/ to avoid hotlink blocking
-const FRONT_BASE = '/muscles/muscular_system_front.png'
-const BACK_BASE = '/muscles/muscular_system_back.png'
-const primaryOverlay = (id: number) => `/muscles/main/muscle-${id}.png`
-const secondaryOverlay = (id: number) => `/muscles/secondary/muscle-${id}.png`
+const FRONT_BASE = '/muscles/muscular_system_front.svg'
+const BACK_BASE = '/muscles/muscular_system_back.svg'
+const primaryOverlay = (id: number) => `/muscles/main/muscle-${id}.svg`
+const secondaryOverlay = (id: number) => `/muscles/secondary/muscle-${id}.svg`
 
 // Which muscle IDs belong to each view
 const FRONT_IDS = new Set([1, 2, 3, 4, 9, 13])

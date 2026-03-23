@@ -78,6 +78,17 @@ export default function SettingsPage() {
             disabled={saving}
           />
 
+          <PillPair<WeightUnit>
+            label="Body weight"
+            options={[
+              { value: 'lbs', label: 'lbs' },
+              { value: 'kg',  label: 'kg' },
+            ]}
+            value={units.bodyWeight}
+            onChange={v => save({ pref_body_weight: v }, 'body_weight')}
+            disabled={saving}
+          />
+
           <PillPair<DistanceUnit>
             label="Distance"
             options={[

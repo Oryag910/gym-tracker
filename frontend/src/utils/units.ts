@@ -12,6 +12,10 @@ export function resolveWeight(pref: WeightUnit | null | undefined, sys: UnitSyst
   if (pref === 'lbs' || pref === 'kg') return pref
   return sys === 'metric' ? 'kg' : 'lbs'
 }
+export function resolveBodyWeight(pref: WeightUnit | null | undefined, sys: UnitSystem): WeightUnit {
+  if (pref === 'lbs' || pref === 'kg') return pref
+  return sys === 'metric' ? 'kg' : 'lbs'
+}
 export function resolveDistance(pref: DistanceUnit | null | undefined, sys: UnitSystem): DistanceUnit {
   if (pref === 'km' || pref === 'mi') return pref
   return sys === 'imperial' ? 'mi' : 'km'

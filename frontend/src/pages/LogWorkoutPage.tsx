@@ -53,7 +53,7 @@ function LogTechniquePanel({ description, category }: { description: string; cat
   )
 }
 
-interface SetForm { weight: string; reps: string }
+interface SetForm { weight: string; reps: string; rpe: string }
 interface ExerciseForm {
   name: string
   sets: SetForm[]
@@ -65,7 +65,7 @@ interface ExerciseForm {
 
 const today = () => new Date().toISOString().split('T')[0]
 const emptyExercise = (): ExerciseForm => ({
-  name: '', sets: [{ weight: '', reps: '' }],
+  name: '', sets: [{ weight: '', reps: '', rpe: '' }],
   lookup: null, showMuscles: false, filter: '', showPicker: false,
 })
 
@@ -122,13 +122,13 @@ export default function LogWorkoutPage() {
 
   const addSet = (i: number) =>
     setExercises(prev => prev.map((ex, idx) =>
-      idx === i ? { ...ex, sets: [...ex.sets, { weight: '', reps: '' }] } : ex))
+      idx === i ? { ...ex, sets: [...ex.sets, { weight: '', reps: '', rpe: '' }] } : ex))
 
   const removeSet = (ei: number, si: number) =>
     setExercises(prev => prev.map((ex, idx) =>
       idx === ei ? { ...ex, sets: ex.sets.filter((_, s) => s !== si) } : ex))
 
-  const updateSet = (ei: number, si: number, field: 'weight' | 'reps', val: string) =>
+  const updateSet = (ei: number, si: number, field: 'weight' | 'reps' | 'rpe', val: string) =>
     setExercises(prev => prev.map((ex, idx) =>
       idx === ei ? { ...ex, sets: ex.sets.map((s, sidx) => sidx === si ? { ...s, [field]: val } : s) } : ex))
 
@@ -144,6 +144,7 @@ export default function LogWorkoutPage() {
           sets: ex.sets.map(s => ({
             weight: s.weight ? fromInputWeight(parseFloat(s.weight), units.weight) : null,
             reps: s.reps ? parseInt(s.reps) : null,
+            rpe: s.rpe ? parseInt(s.rpe) : null,
           })),
         })),
       }
@@ -300,8 +301,8 @@ export default function LogWorkoutPage() {
 
                   {/* Sets */}
                   <div className="space-y-2">
-                    <div className="grid grid-cols-[32px_1fr_1fr_28px] gap-2 text-xs text-slate-500 px-1">
-                      <span>Set</span><span>Weight ({wt})</span><span>Reps</span><span />
+                    <div className="grid grid-cols-[24px_1fr_1fr_52px_24px] gap-2 text-xs text-slate-500 px-1">
+                      <span>Set</span><span>Weight ({wt})</span><span>Reps</span><span>RPE</span><span />
                     </div>
                     <AnimatePresence>
                       {ex.sets.map((s, si) => (
@@ -311,7 +312,7 @@ export default function LogWorkoutPage() {
                           initial={{ opacity: 0 }}
                           animate={{ opacity: 1 }}
                           exit={{ opacity: 0 }}
-                          className="grid grid-cols-[32px_1fr_1fr_28px] gap-2 items-center"
+                          className="grid grid-cols-[24px_1fr_1fr_52px_24px] gap-2 items-center"
                         >
                           <span className="text-slate-500 text-sm text-center">{si + 1}</span>
                           <input
@@ -327,6 +328,13 @@ export default function LogWorkoutPage() {
                             value={s.reps}
                             onChange={e => updateSet(ei, si, 'reps', e.target.value)}
                             placeholder="reps"
+                          />
+                          <input
+                            className={input}
+                            type="number" min="1" max="10"
+                            value={s.rpe}
+                            onChange={e => updateSet(ei, si, 'rpe', e.target.value)}
+                            placeholder="—"
                           />
                           {ex.sets.length > 1 ? (
                             <button type="button" onClick={() => removeSet(ei, si)} className="text-slate-600 hover:text-red-400 transition-colors text-lg leading-none">×</button>

@@ -25,10 +25,12 @@ _migrations = [
     ("exercise_cache", "category", "VARCHAR"),
     ("users", "is_admin", "BOOLEAN DEFAULT FALSE"),
     ("users", "unit_system", "VARCHAR DEFAULT 'imperial'"),
-    ("users", "pref_weight",   "VARCHAR"),
-    ("users", "pref_distance", "VARCHAR"),
-    ("users", "pref_measure",  "VARCHAR"),
-    ("users", "pref_temp",     "VARCHAR"),
+    ("users", "pref_weight",      "VARCHAR"),
+    ("users", "pref_body_weight", "VARCHAR"),
+    ("users", "pref_distance",    "VARCHAR"),
+    ("users", "pref_measure",     "VARCHAR"),
+    ("users", "pref_temp",        "VARCHAR"),
+    ("sets",  "rpe",              "INTEGER"),
 ]
 with engine.connect() as _conn:
     for _table, _col, _type in _migrations:

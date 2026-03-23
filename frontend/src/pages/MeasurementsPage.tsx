@@ -44,7 +44,7 @@ export default function MeasurementsPage() {
     try {
       await createMeasurement({
         date,
-        weight: weight ? fromInputWeight(parseFloat(weight), units.weight) : null,
+        weight: weight ? fromInputWeight(parseFloat(weight), units.bodyWeight) : null,
         body_fat: bodyFat ? parseFloat(bodyFat) : null,
         chest: chest ? fromInputMeasure(parseFloat(chest), units.measure) : null,
         waist: waist ? fromInputMeasure(parseFloat(waist), units.measure) : null,
@@ -70,7 +70,7 @@ export default function MeasurementsPage() {
     setEntries(prev => prev.filter(e => e.id !== id))
   }
 
-  const wt = weightUnit(units.weight)
+  const wt = weightUnit(units.bodyWeight)
   const mt = measureUnit(units.measure)
 
   const fieldInput = (label_: string, value: string, setter: (v: string) => void, unit: string) => (
@@ -158,7 +158,7 @@ export default function MeasurementsPage() {
                     <div className="flex flex-wrap gap-3 mt-1">
                       {e.weight != null && (
                         <span className="text-slate-100 font-semibold">
-                          {toDisplayWeight(e.weight, units.weight)} {wt}
+                          {toDisplayWeight(e.weight, units.bodyWeight)} {wt}
                         </span>
                       )}
                       {e.body_fat != null && (

@@ -19,6 +19,7 @@ function SetRow({ set, workoutId, exerciseId, onUpdated, unitSystem }: {
     set.weight != null ? toDisplayWeight(set.weight, unitSystem as any).toString() : ''
   )
   const [reps, setReps] = useState(set.reps?.toString() ?? '')
+  const [rpe, setRpe] = useState(set.rpe?.toString() ?? '')
   const [saving, setSaving] = useState(false)
   const wt = weightUnit(unitSystem as any)
 
@@ -27,6 +28,7 @@ function SetRow({ set, workoutId, exerciseId, onUpdated, unitSystem }: {
     await updateSet(workoutId, exerciseId, set.id, {
       weight: weight ? fromInputWeight(parseFloat(weight), unitSystem as any) : undefined,
       reps: reps ? parseInt(reps) : undefined,
+      rpe: rpe ? parseInt(rpe) : undefined,
     })
     setSaving(false)
     setEditing(false)
@@ -37,7 +39,7 @@ function SetRow({ set, workoutId, exerciseId, onUpdated, unitSystem }: {
     <motion.div
       layout
       className={`grid items-center gap-3 py-2.5 border-b border-slate-700/50 last:border-0 ${
-        editing ? 'grid-cols-[32px_1fr_1fr_auto_auto]' : 'grid-cols-[32px_1fr_1fr_auto]'
+        editing ? 'grid-cols-[32px_1fr_1fr_52px_auto_auto]' : 'grid-cols-[32px_1fr_1fr_52px_auto]'
       }`}
     >
       <span className="text-slate-500 text-sm text-center">{set.set_number}</span>
@@ -57,6 +59,13 @@ function SetRow({ set, workoutId, exerciseId, onUpdated, unitSystem }: {
             className="bg-slate-900 border border-slate-600 rounded-lg px-2 py-1.5 text-sm text-slate-100 focus:border-blue-400 focus:outline-none w-full"
             placeholder="reps"
           />
+          <input
+            value={rpe}
+            onChange={e => setRpe(e.target.value)}
+            type="number" min="1" max="10"
+            className="bg-slate-900 border border-slate-600 rounded-lg px-2 py-1.5 text-sm text-slate-100 focus:border-blue-400 focus:outline-none w-full"
+            placeholder="RPE"
+          />
           <button onClick={save} disabled={saving} className={btnPrimary + ' py-1.5 px-3 text-sm'}>
             {saving ? '...' : 'Save'}
           </button>
@@ -70,6 +79,9 @@ function SetRow({ set, workoutId, exerciseId, onUpdated, unitSystem }: {
             {set.weight != null ? `${toDisplayWeight(set.weight, unitSystem as any)} ${wt}` : 'BW'}
           </span>
           <span className="text-slate-200 text-sm">{set.reps ?? '—'} reps</span>
+          <span className="text-slate-500 text-xs">
+            {set.rpe != null ? `RPE ${set.rpe}` : '—'}
+          </span>
           <button
             onClick={() => setEditing(true)}
             className="text-slate-600 hover:text-blue-400 transition-colors text-xs"
@@ -194,10 +206,11 @@ function ExerciseCard({ exercise, workoutId, onUpdated, unitSystem }: {
       </AnimatePresence>
 
       {/* Column headers */}
-      <div className="grid grid-cols-[32px_1fr_1fr_auto] gap-3 text-xs text-slate-500 mb-1 px-0">
+      <div className="grid grid-cols-[32px_1fr_1fr_52px_auto] gap-3 text-xs text-slate-500 mb-1 px-0">
         <span className="text-center">Set</span>
         <span>Weight ({weightUnit(unitSystem as any)})</span>
         <span>Reps</span>
+        <span>RPE</span>
         <span />
       </div>
 

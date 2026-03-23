@@ -45,6 +45,7 @@ def create_workout(body: WorkoutCreate, current_user: User = Depends(get_current
                 exercise_id=exercise.id,
                 weight=set_data.weight,
                 reps=set_data.reps,
+                rpe=set_data.rpe,
                 set_number=set_num,
             )
             db.add(s)
@@ -107,5 +108,7 @@ def update_set(
         set_.weight = body.weight
     if body.reps is not None:
         set_.reps = body.reps
+    if body.rpe is not None:
+        set_.rpe = body.rpe
     db.commit()
-    return {"id": set_.id, "weight": set_.weight, "reps": set_.reps}
+    return {"id": set_.id, "weight": set_.weight, "reps": set_.reps, "rpe": set_.rpe}

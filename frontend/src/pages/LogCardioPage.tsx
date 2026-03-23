@@ -14,6 +14,29 @@ import PageTransition from '../components/PageTransition'
 
 const today = () => new Date().toISOString().split('T')[0]
 
+// Pace/duration auto-fill helpers (display units — no conversion needed)
+function parsePaceDisplay(str: string): number | null {
+  const m = str.match(/^(\d+):([0-5]\d)$/)
+  if (!m) return null
+  return parseInt(m[1]) + parseInt(m[2]) / 60
+}
+function parseDurationDisplay(str: string): number | null {
+  const m = str.match(/^(\d+):([0-5]\d)$/)
+  if (m) return parseInt(m[1]) + parseInt(m[2]) / 60
+  const n = parseFloat(str)
+  return isNaN(n) ? null : n
+}
+function formatDurationDisplay(mins: number): string {
+  const m = Math.floor(mins)
+  const s = Math.round((mins - m) * 60)
+  return `${m}:${s.toString().padStart(2, '0')}`
+}
+function formatPaceDisplay(minPerUnit: number): string {
+  const m = Math.floor(minPerUnit)
+  const s = Math.round((minPerUnit - m) * 60)
+  return `${m}:${s.toString().padStart(2, '0')}`
+}
+
 const ACTIVITY_TYPES = ['run', 'swim', 'bike', 'hike', 'other'] as const
 type ActivityType = typeof ACTIVITY_TYPES[number]
 
@@ -78,7 +101,21 @@ export default function LogCardioPage() {
   const addSegment = () => setSegments(prev => [...prev, emptySegment()])
   const removeSegment = (i: number) => setSegments(prev => prev.filter((_, idx) => idx !== i))
   const updateSegment = (i: number, patch: Partial<SegmentForm>) =>
-    setSegments(prev => prev.map((s, idx) => idx === i ? { ...s, ...patch } : s))
+    setSegments(prev => prev.map((s, idx) => {
+      if (idx !== i) return s
+      const next = { ...s, ...patch }
+      const dist = parseFloat(next.distance)
+      const pace = parsePaceDisplay(next.paceStr)
+      const dur  = parseDurationDisplay(next.duration)
+      // Auto-fill the empty third field when the other two are filled
+      if (('distance' in patch || 'paceStr' in patch) && !isNaN(dist) && pace != null && !next.duration)
+        next.duration = formatDurationDisplay(dist * pace)
+      if (('distance' in patch || 'duration' in patch) && !isNaN(dist) && dur != null && !next.paceStr)
+        next.paceStr = formatPaceDisplay(dur / dist)
+      if (('paceStr' in patch || 'duration' in patch) && pace != null && dur != null && !next.distance)
+        next.distance = String(+(dur / pace).toFixed(3))
+      return next
+    }))
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -93,7 +130,7 @@ export default function LogCardioPage() {
           label: s.label || undefined,
           distance: s.distance ? fromInputDistance(parseFloat(s.distance), units.distance) : undefined,
           pace: pace ?? undefined,
-          duration: s.duration ? parseFloat(s.duration) : undefined,
+          duration: s.duration ? (parseDurationDisplay(s.duration) ?? undefined) : undefined,
           hr: s.hr ? parseInt(s.hr) : undefined,
           reps: s.reps ? parseInt(s.reps) : 1,
           notes: s.notes || undefined,
@@ -233,9 +270,9 @@ export default function LogCardioPage() {
                         placeholder="M:SS" />
                     </div>
                     <div>
-                      <label className={label}>Duration (min)</label>
-                      <input className={input} type="number" step="0.1" min="0" value={seg.duration}
-                        onChange={e => updateSegment(i, { duration: e.target.value })} placeholder="—" />
+                      <label className={label}>Duration</label>
+                      <input className={input} type="text" value={seg.duration}
+                        onChange={e => updateSegment(i, { duration: e.target.value })} placeholder="M:SS or min" />
                     </div>
                     <div>
                       <label className={label}>HR (bpm)</label>

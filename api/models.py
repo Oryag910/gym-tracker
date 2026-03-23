@@ -15,10 +15,11 @@ class User(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
 
     unit_system = Column(String, nullable=False, default="imperial")  # 'imperial' | 'metric'
-    pref_weight   = Column(String, nullable=True)   # 'lbs' | 'kg'   — overrides unit_system if set
-    pref_distance = Column(String, nullable=True)   # 'km'  | 'mi'
-    pref_measure  = Column(String, nullable=True)   # 'cm'  | 'in'
-    pref_temp     = Column(String, nullable=True)   # 'c'   | 'f'
+    pref_weight      = Column(String, nullable=True)   # 'lbs' | 'kg'   — gym weights
+    pref_body_weight = Column(String, nullable=True)   # 'lbs' | 'kg'   — body weight (Measurements)
+    pref_distance    = Column(String, nullable=True)   # 'km'  | 'mi'
+    pref_measure     = Column(String, nullable=True)   # 'cm'  | 'in'
+    pref_temp        = Column(String, nullable=True)   # 'c'   | 'f'
 
     workouts = relationship("Workout", back_populates="user", cascade="all, delete-orphan")
     measurements = relationship("Measurement", back_populates="user", cascade="all, delete-orphan")
@@ -58,6 +59,7 @@ class Set(Base):
     exercise_id = Column(Integer, ForeignKey("exercises.id", ondelete="CASCADE"), nullable=False)
     weight = Column(Float, nullable=True)
     reps = Column(Integer, nullable=True)
+    rpe = Column(Integer, nullable=True)   # 1–10
     set_number = Column(Integer, nullable=False)
 
     exercise = relationship("Exercise", back_populates="sets")

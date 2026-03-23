@@ -7,6 +7,7 @@ export interface UserResponse {
   is_admin: boolean
   unit_system: string
   pref_weight: string | null
+  pref_body_weight: string | null
   pref_distance: string | null
   pref_measure: string | null
   pref_temp: string | null
@@ -33,6 +34,7 @@ export const getMe = () =>
 export const updatePreferences = (prefs: {
   unit_system?: string
   pref_weight?: string
+  pref_body_weight?: string
   pref_distance?: string
   pref_measure?: string
   pref_temp?: string

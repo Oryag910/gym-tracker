@@ -18,12 +18,13 @@ interface CompletedSet {
   targetReps: number | null
   actualWeight: number | null  // lbs (canonical)
   actualReps: number | null
+  actualRpe: number | null
 }
 
 type Phase =
   | { kind: 'loading' }
   | { kind: 'ready'; template: TemplateDetail }
-  | { kind: 'active'; template: TemplateDetail; exerciseIndex: number; setIndex: number; completedSets: CompletedSet[]; actualWeight: string; actualReps: string }
+  | { kind: 'active'; template: TemplateDetail; exerciseIndex: number; setIndex: number; completedSets: CompletedSet[]; actualWeight: string; actualReps: string; actualRpe: string }
   | { kind: 'resting'; template: TemplateDetail; exerciseIndex: number; setIndex: number; completedSets: CompletedSet[]; totalSeconds: number; restType: 'set' | 'exercise'; nextExerciseIndex: number; nextSetIndex: number }
   | { kind: 'summary'; template: TemplateDetail; completedSets: CompletedSet[]; workoutName: string; date: string }
   | { kind: 'saving' }
@@ -163,6 +164,7 @@ export default function GuidedWorkoutPage() {
       actualWeight: firstEx.sets[0]?.target_weight != null
         ? String(toDisplayWeight(firstEx.sets[0].target_weight, units.weight)) : '',
       actualReps: firstEx.sets[0]?.target_reps != null ? String(firstEx.sets[0].target_reps) : '',
+      actualRpe: '',
     })
   }
 
@@ -173,11 +175,12 @@ export default function GuidedWorkoutPage() {
       kind: 'active', template, exerciseIndex: exIdx, setIndex: setIdx, completedSets,
       actualWeight: s?.target_weight != null ? String(toDisplayWeight(s.target_weight, units.weight)) : '',
       actualReps: s?.target_reps != null ? String(s.target_reps) : '',
+      actualRpe: '',
     })
   }
 
   const logSet = (p: Extract<Phase, { kind: 'active' }>) => {
-    const { template, exerciseIndex, setIndex, completedSets, actualWeight, actualReps } = p
+    const { template, exerciseIndex, setIndex, completedSets, actualWeight, actualReps, actualRpe } = p
     const ex = template.exercises[exerciseIndex]
     const s = ex.sets[setIndex]
 
@@ -186,6 +189,7 @@ export default function GuidedWorkoutPage() {
       targetWeight: s.target_weight, targetReps: s.target_reps,
       actualWeight: actualWeight ? fromInputWeight(parseFloat(actualWeight), units.weight) : null,
       actualReps: actualReps ? parseInt(actualReps) : null,
+      actualRpe: actualRpe ? parseInt(actualRpe) : null,
     }
     const newCompleted = [...completedSets, newSet]
 
@@ -239,6 +243,7 @@ export default function GuidedWorkoutPage() {
         sets: sets.map(cs => ({
           weight: cs.actualWeight,
           reps: cs.actualReps,
+          rpe: cs.actualRpe,
         })),
       }))
 
@@ -306,7 +311,7 @@ export default function GuidedWorkoutPage() {
   }
 
   if (phase.kind === 'active') {
-    const { template, exerciseIndex, setIndex, completedSets, actualWeight, actualReps } = phase
+    const { template, exerciseIndex, setIndex, completedSets, actualWeight, actualReps, actualRpe } = phase
     const ex = template.exercises[exerciseIndex]
     const s = ex.sets[setIndex]
     const total = totalSetCount(template.exercises)
@@ -340,7 +345,7 @@ export default function GuidedWorkoutPage() {
               </div>
             )}
 
-            <div className="grid grid-cols-2 gap-3 mb-4">
+            <div className="grid grid-cols-2 gap-3 mb-3">
               <div>
                 <label className="block text-xs text-slate-500 mb-1.5 uppercase tracking-wide">Weight ({wt})</label>
                 <input
@@ -362,6 +367,16 @@ export default function GuidedWorkoutPage() {
                   placeholder="reps"
                 />
               </div>
+            </div>
+            <div className="mb-4">
+              <label className="block text-xs text-slate-500 mb-1.5 uppercase tracking-wide">RPE <span className="normal-case text-slate-600">(1–10, optional)</span></label>
+              <input
+                className={input}
+                type="number" min="1" max="10"
+                value={actualRpe}
+                onChange={e => setPhase({ ...phase, actualRpe: e.target.value })}
+                placeholder="—"
+              />
             </div>
 
             <button onClick={() => logSet(phase)}

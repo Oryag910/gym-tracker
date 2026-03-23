@@ -41,6 +41,7 @@ class UserResponse(BaseModel):
     is_admin: bool = False
     unit_system: str = "imperial"
     pref_weight: Optional[str] = None
+    pref_body_weight: Optional[str] = None
     pref_distance: Optional[str] = None
     pref_measure: Optional[str] = None
     pref_temp: Optional[str] = None
@@ -50,11 +51,12 @@ class UserResponse(BaseModel):
 
 
 class UserPreferencesUpdate(BaseModel):
-    unit_system: Optional[str] = None   # 'imperial' | 'metric'
-    pref_weight: Optional[str] = None   # 'lbs' | 'kg'
-    pref_distance: Optional[str] = None # 'km' | 'mi'
-    pref_measure: Optional[str] = None  # 'cm' | 'in'
-    pref_temp: Optional[str] = None     # 'c' | 'f'
+    unit_system: Optional[str] = None        # 'imperial' | 'metric'
+    pref_weight: Optional[str] = None        # 'lbs' | 'kg'
+    pref_body_weight: Optional[str] = None   # 'lbs' | 'kg'
+    pref_distance: Optional[str] = None      # 'km' | 'mi'
+    pref_measure: Optional[str] = None       # 'cm' | 'in'
+    pref_temp: Optional[str] = None          # 'c' | 'f'
 
 
 # --- Sets ---
@@ -62,6 +64,7 @@ class UserPreferencesUpdate(BaseModel):
 class SetCreate(BaseModel):
     weight: Optional[float] = None
     reps: Optional[int] = None
+    rpe: Optional[int] = None
 
 
 class SetResponse(BaseModel):
@@ -69,6 +72,7 @@ class SetResponse(BaseModel):
     set_number: int
     weight: Optional[float]
     reps: Optional[int]
+    rpe: Optional[int]
 
     class Config:
         from_attributes = True
@@ -77,6 +81,7 @@ class SetResponse(BaseModel):
 class SetUpdate(BaseModel):
     weight: Optional[float] = None
     reps: Optional[int] = None
+    rpe: Optional[int] = None
 
 
 # --- Exercises ---

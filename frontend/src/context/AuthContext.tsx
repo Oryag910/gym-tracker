@@ -2,14 +2,15 @@ import { createContext, useContext, useState } from 'react'
 import type { ReactNode } from 'react'
 import { getMe, updatePreferences } from '../api/auth'
 import {
-  resolveWeight, resolveDistance, resolveMeasure, resolveTemp,
+  resolveWeight, resolveBodyWeight, resolveDistance, resolveMeasure, resolveTemp,
 } from '../utils/units'
 import type { UnitSystem, WeightUnit, DistanceUnit, MeasureUnit, TempUnit } from '../utils/units'
 
 export type { UnitSystem }
 
 export interface UserUnits {
-  weight: WeightUnit
+  weight: WeightUnit       // gym weights (sets)
+  bodyWeight: WeightUnit   // body weight (Measurements page)
   distance: DistanceUnit
   measure: MeasureUnit
   temp: TempUnit
@@ -23,6 +24,7 @@ interface AuthContextType {
   setUnitSystem: (s: UnitSystem) => Promise<void>
   setUnitPref: (prefs: Partial<{
     pref_weight: WeightUnit
+    pref_body_weight: WeightUnit
     pref_distance: DistanceUnit
     pref_measure: MeasureUnit
     pref_temp: TempUnit
@@ -43,6 +45,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [prefWeight, setPrefWeight] = useState<WeightUnit | null>(
     () => (localStorage.getItem('pref_weight') as WeightUnit) || null
   )
+  const [prefBodyWeight, setPrefBodyWeight] = useState<WeightUnit | null>(
+    () => (localStorage.getItem('pref_body_weight') as WeightUnit) || null
+  )
   const [prefDistance, setPrefDistance] = useState<DistanceUnit | null>(
     () => (localStorage.getItem('pref_distance') as DistanceUnit) || null
   )
@@ -55,10 +60,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   // Derived: resolve per-dimension prefs against the legacy unit_system fallback
   const units: UserUnits = {
-    weight:   resolveWeight(prefWeight, unitSystem),
-    distance: resolveDistance(prefDistance, unitSystem),
-    measure:  resolveMeasure(prefMeasure, unitSystem),
-    temp:     resolveTemp(prefTemp, unitSystem),
+    weight:     resolveWeight(prefWeight, unitSystem),
+    bodyWeight: resolveBodyWeight(prefBodyWeight, unitSystem),
+    distance:   resolveDistance(prefDistance, unitSystem),
+    measure:    resolveMeasure(prefMeasure, unitSystem),
+    temp:       resolveTemp(prefTemp, unitSystem),
   }
 
   const loginFn = async (t: string) => {
@@ -73,6 +79,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       localStorage.setItem('unitSystem', us)
       // Sync per-dimension prefs
       if (res.data.pref_weight) { setPrefWeight(res.data.pref_weight as WeightUnit); localStorage.setItem('pref_weight', res.data.pref_weight) }
+      if (res.data.pref_body_weight) { setPrefBodyWeight(res.data.pref_body_weight as WeightUnit); localStorage.setItem('pref_body_weight', res.data.pref_body_weight) }
       if (res.data.pref_distance) { setPrefDistance(res.data.pref_distance as DistanceUnit); localStorage.setItem('pref_distance', res.data.pref_distance) }
       if (res.data.pref_measure) { setPrefMeasure(res.data.pref_measure as MeasureUnit); localStorage.setItem('pref_measure', res.data.pref_measure) }
       if (res.data.pref_temp) { setPrefTemp(res.data.pref_temp as TempUnit); localStorage.setItem('pref_temp', res.data.pref_temp) }
@@ -90,15 +97,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const setUnitPref = async (prefs: Partial<{
     pref_weight: WeightUnit
+    pref_body_weight: WeightUnit
     pref_distance: DistanceUnit
     pref_measure: MeasureUnit
     pref_temp: TempUnit
   }>) => {
     await updatePreferences(prefs)
-    if (prefs.pref_weight)   { setPrefWeight(prefs.pref_weight);     localStorage.setItem('pref_weight', prefs.pref_weight) }
-    if (prefs.pref_distance) { setPrefDistance(prefs.pref_distance); localStorage.setItem('pref_distance', prefs.pref_distance) }
-    if (prefs.pref_measure)  { setPrefMeasure(prefs.pref_measure);   localStorage.setItem('pref_measure', prefs.pref_measure) }
-    if (prefs.pref_temp)     { setPrefTemp(prefs.pref_temp);         localStorage.setItem('pref_temp', prefs.pref_temp) }
+    if (prefs.pref_weight)       { setPrefWeight(prefs.pref_weight);           localStorage.setItem('pref_weight', prefs.pref_weight) }
+    if (prefs.pref_body_weight)  { setPrefBodyWeight(prefs.pref_body_weight);  localStorage.setItem('pref_body_weight', prefs.pref_body_weight) }
+    if (prefs.pref_distance)     { setPrefDistance(prefs.pref_distance);       localStorage.setItem('pref_distance', prefs.pref_distance) }
+    if (prefs.pref_measure)      { setPrefMeasure(prefs.pref_measure);         localStorage.setItem('pref_measure', prefs.pref_measure) }
+    if (prefs.pref_temp)         { setPrefTemp(prefs.pref_temp);               localStorage.setItem('pref_temp', prefs.pref_temp) }
   }
 
   const logout = () => {
@@ -106,6 +115,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     localStorage.removeItem('isAdmin')
     localStorage.removeItem('unitSystem')
     localStorage.removeItem('pref_weight')
+    localStorage.removeItem('pref_body_weight')
     localStorage.removeItem('pref_distance')
     localStorage.removeItem('pref_measure')
     localStorage.removeItem('pref_temp')
@@ -113,6 +123,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setIsAdmin(false)
     setUnitSystemState('imperial')
     setPrefWeight(null)
+    setPrefBodyWeight(null)
     setPrefDistance(null)
     setPrefMeasure(null)
     setPrefTemp(null)

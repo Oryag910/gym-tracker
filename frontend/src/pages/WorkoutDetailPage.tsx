@@ -77,9 +77,6 @@ function SetRow({ set, workoutId, exerciseId, onUpdated }: {
 
 function TechniquePanel({ description, category }: { description: string; category: string | null }) {
   const [expanded, setExpanded] = useState(false)
-  const safe = description
-    .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
-    .replace(/\son\w+="[^"]*"/gi, '')
 
   return (
     <div className="mt-3 border-t border-slate-700 pt-3">
@@ -111,10 +108,9 @@ function TechniquePanel({ description, category }: { description: string; catego
             exit={{ opacity: 0, height: 0 }}
             className="overflow-hidden"
           >
-            <div
-              className="mt-2 text-xs text-slate-400 leading-relaxed space-y-1 [&_p]:mb-1 [&_ul]:list-disc [&_ul]:pl-4 [&_li]:mb-0.5"
-              dangerouslySetInnerHTML={{ __html: safe }}
-            />
+            <p className="mt-2 text-xs text-slate-400 leading-relaxed whitespace-pre-wrap">
+              {description}
+            </p>
           </motion.div>
         )}
       </AnimatePresence>

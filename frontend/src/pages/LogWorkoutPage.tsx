@@ -1,8 +1,8 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { createWorkout } from '../api/workouts'
-import { lookupExercise } from '../api/exercises'
+import { listExercises, type GlobalExercise } from '../api/globalExercises'
 import type { ExerciseLookup } from '../api/exercises'
 import MuscleMap from '../components/MuscleMap/MuscleMap'
 import { card, input, btnPrimary, btnGhost } from '../styles/tokens'
@@ -10,9 +10,6 @@ import PageTransition from '../components/PageTransition'
 
 function LogTechniquePanel({ description, category }: { description: string; category: string | null }) {
   const [expanded, setExpanded] = useState(false)
-  const safe = description
-    .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
-    .replace(/\son\w+="[^"]*"/gi, '')
 
   return (
     <div className="mt-3 border-t border-slate-700 pt-3">
@@ -44,10 +41,9 @@ function LogTechniquePanel({ description, category }: { description: string; cat
             exit={{ opacity: 0, height: 0 }}
             className="overflow-hidden"
           >
-            <div
-              className="mt-2 text-xs text-slate-400 leading-relaxed [&_p]:mb-1 [&_ul]:list-disc [&_ul]:pl-4 [&_li]:mb-0.5"
-              dangerouslySetInnerHTML={{ __html: safe }}
-            />
+            <p className="mt-2 text-xs text-slate-400 leading-relaxed whitespace-pre-wrap">
+              {description}
+            </p>
           </motion.div>
         )}
       </AnimatePresence>
@@ -60,17 +56,29 @@ interface ExerciseForm {
   name: string
   sets: SetForm[]
   lookup: ExerciseLookup | null
-  lookupLoading: boolean
   showMuscles: boolean
+  filter: string
+  showPicker: boolean
 }
 
 const today = () => new Date().toISOString().split('T')[0]
 const emptyExercise = (): ExerciseForm => ({
   name: '', sets: [{ weight: '', reps: '' }],
-  lookup: null, lookupLoading: false, showMuscles: false,
+  lookup: null, showMuscles: false, filter: '', showPicker: false,
 })
 
-let debounceTimer: ReturnType<typeof setTimeout>
+function libraryToLookup(ex: GlobalExercise): ExerciseLookup {
+  return {
+    canonical_name: ex.name,
+    image_url: ex.image_url,
+    muscles_primary: ex.muscles_primary,
+    muscles_secondary: ex.muscles_secondary,
+    muscles_primary_ids: ex.muscles_primary_ids,
+    muscles_secondary_ids: ex.muscles_secondary_ids,
+    description: ex.description,
+    category: ex.category,
+  }
+}
 
 export default function LogWorkoutPage() {
   const navigate = useNavigate()
@@ -80,23 +88,29 @@ export default function LogWorkoutPage() {
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
   const [error, setError] = useState('')
+  const [library, setLibrary] = useState<GlobalExercise[]>([])
+  const pickerRefs = useRef<(HTMLDivElement | null)[]>([])
+
+  useEffect(() => {
+    listExercises().then(r => setLibrary(r.data)).catch(() => {})
+  }, [])
 
   const updateExercise = (i: number, patch: Partial<ExerciseForm>) =>
     setExercises(prev => prev.map((ex, idx) => idx === i ? { ...ex, ...patch } : ex))
 
-  const handleExerciseNameChange = (i: number, val: string) => {
-    updateExercise(i, { name: val, lookup: null })
-    clearTimeout(debounceTimer)
-    if (val.trim().length < 2) return
-    debounceTimer = setTimeout(async () => {
-      updateExercise(i, { lookupLoading: true })
-      try {
-        const data = await lookupExercise(val.trim())
-        updateExercise(i, { lookup: data, lookupLoading: false, showMuscles: true })
-      } catch {
-        updateExercise(i, { lookupLoading: false })
-      }
-    }, 500)
+  const selectLibraryExercise = (ei: number, libEx: GlobalExercise) => {
+    const lookup = libraryToLookup(libEx)
+    updateExercise(ei, {
+      name: libEx.name,
+      filter: '',
+      showPicker: false,
+      lookup,
+      showMuscles: libEx.muscles_primary_ids.length > 0 || libEx.muscles_secondary_ids.length > 0,
+    })
+  }
+
+  const handleFilterChange = (i: number, val: string) => {
+    updateExercise(i, { filter: val, showPicker: true, name: '', lookup: null, showMuscles: false })
   }
 
   const addExercise = () => setExercises(prev => [...prev, emptyExercise()])
@@ -158,127 +172,170 @@ export default function LogWorkoutPage() {
 
           {/* Exercises */}
           <AnimatePresence>
-            {exercises.map((ex, ei) => (
-              <motion.div
-                key={ei}
-                layout
-                initial={{ opacity: 0, y: 8 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, scale: 0.97 }}
-                className={card}
-              >
-                {/* Exercise header */}
-                <div className="flex gap-2 mb-4">
-                  <div className="flex-1 relative">
-                    <input
-                      className={input}
-                      value={ex.name}
-                      onChange={e => handleExerciseNameChange(ei, e.target.value)}
-                      placeholder={`Exercise ${ei + 1}`}
-                      required
-                    />
-                    {ex.lookupLoading && (
-                      <div className="absolute right-3 top-1/2 -translate-y-1/2">
-                        <svg className="animate-spin w-4 h-4 text-blue-400" fill="none" viewBox="0 0 24 24">
-                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
-                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+            {exercises.map((ex, ei) => {
+              const filtered = library.filter(l =>
+                ex.filter.trim().length === 0
+                  ? true
+                  : l.name.toLowerCase().includes(ex.filter.toLowerCase())
+              )
+
+              return (
+                <motion.div
+                  key={ei}
+                  layout
+                  initial={{ opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, scale: 0.97 }}
+                  className={card}
+                >
+                  {/* Exercise picker */}
+                  <div className="flex gap-2 mb-4">
+                    <div className="flex-1 relative" ref={el => { pickerRefs.current[ei] = el }}>
+                      {ex.name ? (
+                        /* Selected state */
+                        <div className="flex items-center gap-2">
+                          <div className={`${input} flex-1 text-slate-100 cursor-default`}>
+                            {ex.name}
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => updateExercise(ei, { name: '', lookup: null, showMuscles: false, filter: '', showPicker: true })}
+                            className="text-xs text-slate-500 hover:text-blue-400 transition-colors shrink-0"
+                          >
+                            Change
+                          </button>
+                        </div>
+                      ) : (
+                        /* Search state */
+                        <>
+                          <input
+                            className={input}
+                            value={ex.filter}
+                            onChange={e => handleFilterChange(ei, e.target.value)}
+                            onFocus={() => updateExercise(ei, { showPicker: true })}
+                            onBlur={() => setTimeout(() => updateExercise(ei, { showPicker: false }), 150)}
+                            placeholder="Search exercises..."
+                            autoFocus={ei === exercises.length - 1 && exercises.length > 1}
+                          />
+                          {ex.showPicker && library.length > 0 && (
+                            <div className="absolute z-20 top-full mt-1 left-0 right-0 bg-slate-800 border border-slate-700 rounded-xl shadow-xl overflow-hidden max-h-52 overflow-y-auto">
+                              {filtered.length === 0 ? (
+                                <div className="px-3 py-3 text-xs text-slate-500">No exercises match "{ex.filter}"</div>
+                              ) : filtered.map(libEx => (
+                                <button
+                                  key={libEx.id}
+                                  type="button"
+                                  onMouseDown={() => selectLibraryExercise(ei, libEx)}
+                                  className="w-full flex items-center gap-3 px-3 py-2.5 hover:bg-slate-700/60 transition-colors text-left border-b border-slate-700/50 last:border-0"
+                                >
+                                  {libEx.image_url && (
+                                    <img src={libEx.image_url} alt={libEx.name} className="w-8 h-8 object-cover rounded bg-slate-700 shrink-0" />
+                                  )}
+                                  <div>
+                                    <div className="text-sm text-slate-200">{libEx.name}</div>
+                                    {libEx.category && <div className="text-[11px] text-slate-500">{libEx.category}</div>}
+                                  </div>
+                                </button>
+                              ))}
+                            </div>
+                          )}
+                        </>
+                      )}
+                    </div>
+                    {exercises.length > 1 && (
+                      <button type="button" onClick={() => removeExercise(ei)} className="text-slate-500 hover:text-red-400 transition-colors px-2">
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                         </svg>
-                      </div>
+                      </button>
                     )}
                   </div>
-                  {exercises.length > 1 && (
-                    <button type="button" onClick={() => removeExercise(ei)} className="text-slate-500 hover:text-red-400 transition-colors px-2">
-                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                      </svg>
-                    </button>
-                  )}
-                </div>
 
-                {/* Muscle map */}
-                <AnimatePresence>
-                  {ex.lookup && ex.showMuscles && (
-                    <motion.div
-                      initial={{ opacity: 0, height: 0 }}
-                      animate={{ opacity: 1, height: 'auto' }}
-                      exit={{ opacity: 0, height: 0 }}
-                      className="overflow-hidden mb-4"
-                    >
-                      <div className="flex items-center justify-between mb-2">
-                        <div className="text-xs text-slate-500 font-medium">
-                          {ex.lookup.canonical_name ?? ex.name}
-                        </div>
-                        <button type="button" onClick={() => updateExercise(ei, { showMuscles: false })} className={btnGhost}>
-                          Hide
-                        </button>
-                      </div>
-                      {ex.lookup.image_url && (
-                        <img
-                          src={ex.lookup.image_url}
-                          alt={ex.lookup.canonical_name ?? ex.name}
-                          className="h-28 object-cover rounded-lg mb-3 bg-slate-700"
-                          onError={e => { (e.target as HTMLImageElement).style.display = 'none' }}
-                        />
-                      )}
-                      <MuscleMap
-                        primary={ex.lookup.muscles_primary}
-                        secondary={ex.lookup.muscles_secondary}
-                        primaryIds={ex.lookup.muscles_primary_ids}
-                        secondaryIds={ex.lookup.muscles_secondary_ids}
-                      />
-                      {ex.lookup.description && (
-                        <LogTechniquePanel description={ex.lookup.description} category={ex.lookup.category} />
-                      )}
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-
-                {/* Sets */}
-                <div className="space-y-2">
-                  <div className="grid grid-cols-[32px_1fr_1fr_28px] gap-2 text-xs text-slate-500 px-1">
-                    <span>Set</span><span>Weight (lbs)</span><span>Reps</span><span />
-                  </div>
+                  {/* Muscle map + technique */}
                   <AnimatePresence>
-                    {ex.sets.map((s, si) => (
+                    {ex.lookup && ex.showMuscles && (
                       <motion.div
-                        key={si}
-                        layout
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        exit={{ opacity: 0 }}
-                        className="grid grid-cols-[32px_1fr_1fr_28px] gap-2 items-center"
+                        initial={{ opacity: 0, height: 0 }}
+                        animate={{ opacity: 1, height: 'auto' }}
+                        exit={{ opacity: 0, height: 0 }}
+                        className="overflow-hidden mb-4"
                       >
-                        <span className="text-slate-500 text-sm text-center">{si + 1}</span>
-                        <input
-                          className={input}
-                          type="number" step="0.5" min="0"
-                          value={s.weight}
-                          onChange={e => updateSet(ei, si, 'weight', e.target.value)}
-                          placeholder="BW"
+                        <div className="flex items-center justify-between mb-2">
+                          <div className="text-xs text-slate-500 font-medium">
+                            {ex.lookup.canonical_name ?? ex.name}
+                          </div>
+                          <button type="button" onClick={() => updateExercise(ei, { showMuscles: false })} className={btnGhost}>
+                            Hide
+                          </button>
+                        </div>
+                        {ex.lookup.image_url && (
+                          <img
+                            src={ex.lookup.image_url}
+                            alt={ex.lookup.canonical_name ?? ex.name}
+                            className="h-28 object-cover rounded-lg mb-3 bg-slate-700"
+                            onError={e => { (e.target as HTMLImageElement).style.display = 'none' }}
+                          />
+                        )}
+                        <MuscleMap
+                          primary={ex.lookup.muscles_primary}
+                          secondary={ex.lookup.muscles_secondary}
+                          primaryIds={ex.lookup.muscles_primary_ids}
+                          secondaryIds={ex.lookup.muscles_secondary_ids}
                         />
-                        <input
-                          className={input}
-                          type="number" min="0"
-                          value={s.reps}
-                          onChange={e => updateSet(ei, si, 'reps', e.target.value)}
-                          placeholder="reps"
-                        />
-                        {ex.sets.length > 1 ? (
-                          <button type="button" onClick={() => removeSet(ei, si)} className="text-slate-600 hover:text-red-400 transition-colors text-lg leading-none">×</button>
-                        ) : <span />}
+                        {ex.lookup.description && (
+                          <LogTechniquePanel description={ex.lookup.description} category={ex.lookup.category} />
+                        )}
                       </motion.div>
-                    ))}
+                    )}
                   </AnimatePresence>
-                  <button
-                    type="button"
-                    onClick={() => addSet(ei)}
-                    className="text-slate-500 hover:text-blue-400 text-sm transition-colors mt-1"
-                  >
-                    + Add Set
-                  </button>
-                </div>
-              </motion.div>
-            ))}
+
+                  {/* Sets */}
+                  <div className="space-y-2">
+                    <div className="grid grid-cols-[32px_1fr_1fr_28px] gap-2 text-xs text-slate-500 px-1">
+                      <span>Set</span><span>Weight (lbs)</span><span>Reps</span><span />
+                    </div>
+                    <AnimatePresence>
+                      {ex.sets.map((s, si) => (
+                        <motion.div
+                          key={si}
+                          layout
+                          initial={{ opacity: 0 }}
+                          animate={{ opacity: 1 }}
+                          exit={{ opacity: 0 }}
+                          className="grid grid-cols-[32px_1fr_1fr_28px] gap-2 items-center"
+                        >
+                          <span className="text-slate-500 text-sm text-center">{si + 1}</span>
+                          <input
+                            className={input}
+                            type="number" step="0.5" min="0"
+                            value={s.weight}
+                            onChange={e => updateSet(ei, si, 'weight', e.target.value)}
+                            placeholder="BW"
+                          />
+                          <input
+                            className={input}
+                            type="number" min="0"
+                            value={s.reps}
+                            onChange={e => updateSet(ei, si, 'reps', e.target.value)}
+                            placeholder="reps"
+                          />
+                          {ex.sets.length > 1 ? (
+                            <button type="button" onClick={() => removeSet(ei, si)} className="text-slate-600 hover:text-red-400 transition-colors text-lg leading-none">×</button>
+                          ) : <span />}
+                        </motion.div>
+                      ))}
+                    </AnimatePresence>
+                    <button
+                      type="button"
+                      onClick={() => addSet(ei)}
+                      className="text-slate-500 hover:text-blue-400 text-sm transition-colors mt-1"
+                    >
+                      + Add Set
+                    </button>
+                  </div>
+                </motion.div>
+              )
+            })}
           </AnimatePresence>
 
           {/* Add exercise */}
@@ -294,12 +351,18 @@ export default function LogWorkoutPage() {
 
           <motion.button
             type="submit"
-            disabled={saving}
-            animate={saved ? { backgroundColor: '#34d399', scale: 1.02 } : {}}
-            whileTap={{ scale: 0.97 }}
-            className={`${btnPrimary} w-full py-3 text-base`}
+            disabled={saving || exercises.some(ex => !ex.name)}
+            whileTap={{ scale: 0.98 }}
+            className={`${btnPrimary} w-full py-3 text-base relative`}
           >
-            {saved ? '✓ Saved!' : saving ? 'Saving...' : 'Save Workout'}
+            {saved ? (
+              <span className="flex items-center justify-center gap-2">
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                </svg>
+                Saved!
+              </span>
+            ) : saving ? 'Saving...' : 'Save Workout'}
           </motion.button>
         </form>
       </div>

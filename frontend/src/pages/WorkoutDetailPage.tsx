@@ -8,19 +8,24 @@ import type { ExerciseLookup } from '../api/exercises'
 import MuscleMap from '../components/MuscleMap/MuscleMap'
 import { card, skeleton, btnPrimary, btnDanger } from '../styles/tokens'
 import PageTransition from '../components/PageTransition'
+import { useAuth } from '../context/AuthContext'
+import { toDisplayWeight, fromInputWeight, weightUnit } from '../utils/units'
 
-function SetRow({ set, workoutId, exerciseId, onUpdated }: {
-  set: SetResponse; workoutId: number; exerciseId: number; onUpdated: () => void
+function SetRow({ set, workoutId, exerciseId, onUpdated, unitSystem }: {
+  set: SetResponse; workoutId: number; exerciseId: number; onUpdated: () => void; unitSystem: string
 }) {
   const [editing, setEditing] = useState(false)
-  const [weight, setWeight] = useState(set.weight?.toString() ?? '')
+  const [weight, setWeight] = useState(
+    set.weight != null ? toDisplayWeight(set.weight, unitSystem as any).toString() : ''
+  )
   const [reps, setReps] = useState(set.reps?.toString() ?? '')
   const [saving, setSaving] = useState(false)
+  const wt = weightUnit(unitSystem as any)
 
   const save = async () => {
     setSaving(true)
     await updateSet(workoutId, exerciseId, set.id, {
-      weight: weight ? parseFloat(weight) : undefined,
+      weight: weight ? fromInputWeight(parseFloat(weight), unitSystem as any) : undefined,
       reps: reps ? parseInt(reps) : undefined,
     })
     setSaving(false)
@@ -43,7 +48,7 @@ function SetRow({ set, workoutId, exerciseId, onUpdated }: {
             value={weight}
             onChange={e => setWeight(e.target.value)}
             className="bg-slate-900 border border-slate-600 rounded-lg px-2 py-1.5 text-sm text-slate-100 focus:border-blue-400 focus:outline-none w-full"
-            placeholder="lbs"
+            placeholder={wt}
             autoFocus
           />
           <input
@@ -61,7 +66,9 @@ function SetRow({ set, workoutId, exerciseId, onUpdated }: {
         </>
       ) : (
         <>
-          <span className="text-slate-200 text-sm">{set.weight != null ? `${set.weight} lbs` : 'BW'}</span>
+          <span className="text-slate-200 text-sm">
+            {set.weight != null ? `${toDisplayWeight(set.weight, unitSystem as any)} ${wt}` : 'BW'}
+          </span>
           <span className="text-slate-200 text-sm">{set.reps ?? '—'} reps</span>
           <button
             onClick={() => setEditing(true)}
@@ -118,8 +125,8 @@ function TechniquePanel({ description, category }: { description: string; catego
   )
 }
 
-function ExerciseCard({ exercise, workoutId, onUpdated }: {
-  exercise: ExerciseResponse; workoutId: number; onUpdated: () => void
+function ExerciseCard({ exercise, workoutId, onUpdated, unitSystem }: {
+  exercise: ExerciseResponse; workoutId: number; onUpdated: () => void; unitSystem: string
 }) {
   const [lookup, setLookup] = useState<ExerciseLookup | null>(null)
   const [showMuscles, setShowMuscles] = useState(false)
@@ -189,13 +196,13 @@ function ExerciseCard({ exercise, workoutId, onUpdated }: {
       {/* Column headers */}
       <div className="grid grid-cols-[32px_1fr_1fr_auto] gap-3 text-xs text-slate-500 mb-1 px-0">
         <span className="text-center">Set</span>
-        <span>Weight</span>
+        <span>Weight ({weightUnit(unitSystem as any)})</span>
         <span>Reps</span>
         <span />
       </div>
 
       {exercise.sets.map(s => (
-        <SetRow key={s.id} set={s} workoutId={workoutId} exerciseId={exercise.id} onUpdated={onUpdated} />
+        <SetRow key={s.id} set={s} workoutId={workoutId} exerciseId={exercise.id} onUpdated={onUpdated} unitSystem={unitSystem} />
       ))}
     </div>
   )
@@ -204,6 +211,7 @@ function ExerciseCard({ exercise, workoutId, onUpdated }: {
 export default function WorkoutDetailPage() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
+  const { unitSystem } = useAuth()
   const [workout, setWorkout] = useState<WorkoutDetail | null>(null)
   const [showDeleteModal, setShowDeleteModal] = useState(false)
   const [deleting, setDeleting] = useState(false)
@@ -249,7 +257,7 @@ export default function WorkoutDetailPage() {
 
         {/* Exercises */}
         {workout.exercises.map(ex => (
-          <ExerciseCard key={ex.id} exercise={ex} workoutId={workout.id} onUpdated={load} />
+          <ExerciseCard key={ex.id} exercise={ex} workoutId={workout.id} onUpdated={load} unitSystem={unitSystem} />
         ))}
 
         {/* Delete modal */}

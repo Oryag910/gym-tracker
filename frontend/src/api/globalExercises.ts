@@ -46,3 +46,8 @@ export interface ExerciseDBResult {
 
 export const searchExerciseDB = (q: string) =>
   client.get<ExerciseDBResult[]>(`/library/exercisedb-search?q=${encodeURIComponent(q)}`)
+
+export const importFromWger = (limit = 50, offset = 0) =>
+  client.post<{ imported: number; skipped: number; total_in_batch: number }>(
+    `/library/import-wger?limit=${limit}&offset=${offset}`
+  )

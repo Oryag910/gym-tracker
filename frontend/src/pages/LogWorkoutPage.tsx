@@ -7,6 +7,8 @@ import type { ExerciseLookup } from '../api/exercises'
 import MuscleMap from '../components/MuscleMap/MuscleMap'
 import { card, input, btnPrimary, btnGhost } from '../styles/tokens'
 import PageTransition from '../components/PageTransition'
+import { useAuth } from '../context/AuthContext'
+import { toDisplayWeight, fromInputWeight, weightUnit } from '../utils/units'
 
 function LogTechniquePanel({ description, category }: { description: string; category: string | null }) {
   const [expanded, setExpanded] = useState(false)
@@ -82,6 +84,8 @@ function libraryToLookup(ex: GlobalExercise): ExerciseLookup {
 
 export default function LogWorkoutPage() {
   const navigate = useNavigate()
+  const { unitSystem } = useAuth()
+  const wt = weightUnit(unitSystem)
   const [name, setName] = useState('')
   const [date, setDate] = useState(today())
   const [exercises, setExercises] = useState<ExerciseForm[]>([emptyExercise()])
@@ -138,7 +142,7 @@ export default function LogWorkoutPage() {
         exercises: exercises.map(ex => ({
           name: ex.name,
           sets: ex.sets.map(s => ({
-            weight: s.weight ? parseFloat(s.weight) : null,
+            weight: s.weight ? fromInputWeight(parseFloat(s.weight), unitSystem) : null,
             reps: s.reps ? parseInt(s.reps) : null,
           })),
         })),
@@ -297,7 +301,7 @@ export default function LogWorkoutPage() {
                   {/* Sets */}
                   <div className="space-y-2">
                     <div className="grid grid-cols-[32px_1fr_1fr_28px] gap-2 text-xs text-slate-500 px-1">
-                      <span>Set</span><span>Weight (lbs)</span><span>Reps</span><span />
+                      <span>Set</span><span>Weight ({wt})</span><span>Reps</span><span />
                     </div>
                     <AnimatePresence>
                       {ex.sets.map((s, si) => (

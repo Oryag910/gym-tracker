@@ -39,9 +39,14 @@ class UserResponse(BaseModel):
     username: str
     email: str
     is_admin: bool = False
+    unit_system: str = "imperial"
 
     class Config:
         from_attributes = True
+
+
+class UserPreferencesUpdate(BaseModel):
+    unit_system: str  # 'imperial' | 'metric'
 
 
 # --- Sets ---
@@ -154,6 +159,113 @@ class CompareResponse(BaseModel):
     workout_a: WorkoutSummary
     workout_b: WorkoutSummary
     exercises: list[ExerciseCompare]
+
+
+# --- Measurements ---
+
+class MeasurementCreate(BaseModel):
+    date: date
+    weight: Optional[float] = None      # lbs
+    body_fat: Optional[float] = None    # %
+    chest: Optional[float] = None       # cm
+    waist: Optional[float] = None
+    hips: Optional[float] = None
+    arms: Optional[float] = None
+    thighs: Optional[float] = None
+    neck: Optional[float] = None
+    notes: Optional[str] = None
+
+
+class MeasurementResponse(BaseModel):
+    id: int
+    date: date
+    weight: Optional[float]
+    body_fat: Optional[float]
+    chest: Optional[float]
+    waist: Optional[float]
+    hips: Optional[float]
+    arms: Optional[float]
+    thighs: Optional[float]
+    neck: Optional[float]
+    notes: Optional[str]
+
+    class Config:
+        from_attributes = True
+
+
+# --- Cardio ---
+
+class CardioSegmentCreate(BaseModel):
+    sort_order: int = 0
+    label: Optional[str] = None
+    segment_type: str = "easy"
+    distance: Optional[float] = None    # km
+    duration: Optional[float] = None    # minutes
+    pace: Optional[float] = None        # min/km as float
+    hr: Optional[int] = None
+    reps: int = 1
+    notes: Optional[str] = None
+
+
+class CardioSegmentResponse(BaseModel):
+    id: int
+    sort_order: int
+    label: Optional[str]
+    segment_type: str
+    distance: Optional[float]
+    duration: Optional[float]
+    pace: Optional[float]
+    hr: Optional[int]
+    reps: int
+    notes: Optional[str]
+
+    class Config:
+        from_attributes = True
+
+
+class CardioSessionCreate(BaseModel):
+    date: date
+    name: str
+    activity_type: str = "run"
+    total_distance: Optional[float] = None
+    total_duration: Optional[float] = None
+    avg_hr: Optional[int] = None
+    max_hr: Optional[int] = None
+    calories: Optional[int] = None
+    temperature: Optional[float] = None
+    notes: Optional[str] = None
+    segments: List[CardioSegmentCreate] = []
+
+
+class CardioSessionSummary(BaseModel):
+    id: int
+    date: date
+    name: str
+    activity_type: str
+    total_distance: Optional[float]
+    total_duration: Optional[float]
+    avg_hr: Optional[int]
+
+    class Config:
+        from_attributes = True
+
+
+class CardioSessionResponse(BaseModel):
+    id: int
+    date: date
+    name: str
+    activity_type: str
+    total_distance: Optional[float]
+    total_duration: Optional[float]
+    avg_hr: Optional[int]
+    max_hr: Optional[int]
+    calories: Optional[int]
+    temperature: Optional[float]
+    notes: Optional[str]
+    segments: List[CardioSegmentResponse]
+
+    class Config:
+        from_attributes = True
 
 
 # --- Custom Exercise Library ---

@@ -16,4 +16,9 @@ export const forgotAccount = (email: string) =>
   client.post('/auth/forgot-account', { email })
 
 export const getMe = () =>
-  client.get<{ id: number; username: string; email: string; is_admin: boolean }>('/auth/me')
+  client.get<{ id: number; username: string; email: string; is_admin: boolean; unit_system: string }>('/auth/me')
+
+export const updatePreferences = (unit_system: string) =>
+  client.patch<{ id: number; username: string; email: string; is_admin: boolean; unit_system: string }>(
+    '/auth/me/preferences', { unit_system }
+  )

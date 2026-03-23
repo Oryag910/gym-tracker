@@ -135,6 +135,94 @@ def delete_exercise(
     db.commit()
 
 
+@router.post("/import-wger")
+async def import_from_wger(
+    limit: int = 50,
+    offset: int = 0,
+    admin: User = Depends(_require_admin),
+    db: Session = Depends(get_db),
+):
+    """Bulk-import exercises from wger.de that have images. Admin only."""
+    from api.services.exercise_service import MUSCLE_MAP
+    imported = 0
+    skipped = 0
+
+    async with httpx.AsyncClient(timeout=15.0) as client:
+        # Fetch exercises that have images
+        img_resp = await client.get(
+            "https://wger.de/api/v2/exerciseimage/",
+            params={"format": "json", "limit": limit, "offset": offset},
+        )
+        img_resp.raise_for_status()
+        img_data = img_resp.json()
+        results = img_data.get("results", [])
+
+        # Group images by exercise_base id (take first image per exercise)
+        base_to_image: dict[int, str] = {}
+        for img in results:
+            base_id = img.get("exercise_base")
+            if base_id and base_id not in base_to_image:
+                base_to_image[base_id] = img["image"]
+
+        for base_id, image_url in base_to_image.items():
+            try:
+                info_resp = await client.get(
+                    f"https://wger.de/api/v2/exerciseinfo/{base_id}/",
+                    params={"format": "json"},
+                )
+                if info_resp.status_code != 200:
+                    skipped += 1
+                    continue
+                info = info_resp.json()
+
+                # Get English name
+                name = None
+                description = None
+                for t in info.get("translations", []):
+                    if t.get("language") == 2:
+                        name = t.get("name", "").strip()
+                        desc = t.get("description", "").strip()
+                        if desc:
+                            description = desc
+                        break
+                if not name:
+                    skipped += 1
+                    continue
+
+                # Skip if already exists (case-insensitive)
+                existing = db.query(GlobalExercise).filter(
+                    GlobalExercise.name_lower == name.lower()
+                ).first()
+                if existing:
+                    skipped += 1
+                    continue
+
+                # Extract muscles
+                raw_pri = [m for m in info.get("muscles", []) if isinstance(m, int)]
+                raw_sec = [m for m in info.get("muscles_secondary", []) if isinstance(m, int)]
+                category = info.get("category", {}).get("name") if info.get("category") else None
+
+                ex = GlobalExercise(
+                    name=name,
+                    name_lower=name.lower(),
+                    category=category,
+                    image_url=image_url,
+                    muscles_primary=json.dumps(_ids_to_names(raw_pri)),
+                    muscles_secondary=json.dumps(_ids_to_names(raw_sec)),
+                    muscles_primary_ids=json.dumps(raw_pri),
+                    muscles_secondary_ids=json.dumps(raw_sec),
+                    description=description,
+                )
+                db.add(ex)
+                imported += 1
+            except Exception:
+                skipped += 1
+                continue
+
+    db.commit()
+    return {"imported": imported, "skipped": skipped, "total_in_batch": len(base_to_image)}
+
+
 @router.get("/exercisedb-search")
 async def exercisedb_search(
     q: str = Query(..., min_length=1),

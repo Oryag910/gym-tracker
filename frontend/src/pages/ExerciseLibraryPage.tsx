@@ -6,6 +6,7 @@ import {
   updateExercise,
   deleteExercise,
   searchExerciseDB,
+  importFromWger,
   type GlobalExercise,
   type GlobalExercisePayload,
   type ExerciseDBResult,
@@ -307,6 +308,8 @@ export default function ExerciseLibraryPage() {
   const [editTarget, setEditTarget] = useState<GlobalExercise | null>(null)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
+  const [wgerImporting, setWgerImporting] = useState(false)
+  const [wgerResult, setWgerResult] = useState<{ imported: number; skipped: number } | null>(null)
 
   const load = async () => {
     try {
@@ -352,17 +355,42 @@ export default function ExerciseLibraryPage() {
   const startEdit = (ex: GlobalExercise) => { setEditTarget(ex); setMode('edit'); setError('') }
   const cancel = () => { setMode('list'); setEditTarget(null); setError('') }
 
+  const handleWgerImport = async (offset = 0) => {
+    setWgerImporting(true)
+    setWgerResult(null)
+    try {
+      const res = await importFromWger(50, offset)
+      setWgerResult(res.data)
+      await load()
+    } catch {
+      setError('Import from wger failed')
+    } finally {
+      setWgerImporting(false)
+    }
+  }
+
   return (
     <PageTransition>
       <div className="space-y-6 max-w-2xl mx-auto">
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between flex-wrap gap-2">
           <h1 className="text-2xl font-black text-slate-100 tracking-tight">Exercise Library</h1>
           {isAdmin && mode === 'list' && (
-            <button onClick={() => { setMode('create'); setError('') }} className={`${btnPrimary} px-4 py-2 text-sm`}>
-              + Add Exercise
-            </button>
+            <div className="flex gap-2 flex-wrap">
+              <button onClick={() => handleWgerImport(0)} disabled={wgerImporting}
+                className="text-xs px-3 py-2 rounded-lg border border-slate-600 text-slate-400 hover:text-slate-200 hover:border-slate-500 transition-colors disabled:opacity-50">
+                {wgerImporting ? 'Importing...' : 'Import from wger'}
+              </button>
+              <button onClick={() => { setMode('create'); setError('') }} className={`${btnPrimary} px-4 py-2 text-sm`}>
+                + Add Exercise
+              </button>
+            </div>
           )}
         </div>
+        {wgerResult && (
+          <p className="text-emerald-400 text-sm">
+            Imported {wgerResult.imported} exercises, skipped {wgerResult.skipped} duplicates.
+          </p>
+        )}
 
         {error && <p className="text-red-400 text-sm">{error}</p>}
 

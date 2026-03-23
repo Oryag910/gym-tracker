@@ -27,12 +27,30 @@ const ChartIcon = () => (
     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z" />
   </svg>
 )
+const HeartIcon = () => (
+  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+  </svg>
+)
+const RunIcon = () => (
+  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+  </svg>
+)
 
 const navItems = [
   { to: '/', icon: <HomeIcon />, label: 'Home' },
   { to: '/workouts', icon: <ListIcon />, label: 'Workouts' },
   { to: '/prs', icon: <TrophyIcon />, label: 'PRs' },
   { to: '/analytics', icon: <ChartIcon />, label: 'Analytics' },
+]
+
+const mobileBottomItems = [
+  { to: '/', icon: <HomeIcon />, label: 'Home' },
+  { to: '/workouts', icon: <ListIcon />, label: 'Workouts' },
+  // center: log button
+  { to: '/analytics', icon: <ChartIcon />, label: 'Analytics' },
+  { to: '/cardio', icon: <RunIcon />, label: 'Cardio' },
 ]
 
 export default function Layout({ children }: { children: React.ReactNode }) {
@@ -43,28 +61,30 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   const isActive = (to: string) =>
     to === '/' ? location.pathname === '/' : location.pathname.startsWith(to)
 
+  const navLink = (to: string, label: string, icon?: React.ReactNode) => (
+    <Link
+      key={to}
+      to={to}
+      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm transition-colors ${
+        isActive(to)
+          ? 'bg-blue-500/10 text-blue-400 font-medium'
+          : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800'
+      }`}
+    >
+      {icon}
+      {label}
+    </Link>
+  )
+
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100">
       {/* Desktop top nav */}
-      <nav className="hidden md:flex items-center gap-1 px-6 py-3 border-b border-slate-800 bg-slate-950 sticky top-0 z-20">
+      <nav className="hidden md:flex items-center gap-1 px-6 py-3 border-b border-slate-800 bg-slate-950 sticky top-0 z-20 flex-wrap">
         <Link to="/" className="text-blue-400 font-bold text-lg mr-6 tracking-tight">
           GymTracker
         </Link>
 
-        {navItems.map((item) => (
-          <Link
-            key={item.to}
-            to={item.to}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm transition-colors ${
-              isActive(item.to)
-                ? 'bg-blue-500/10 text-blue-400 font-medium'
-                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800'
-            }`}
-          >
-            {item.icon}
-            {item.label}
-          </Link>
-        ))}
+        {navItems.map(item => navLink(item.to, item.label, item.icon))}
 
         <Link
           to="/log"
@@ -74,27 +94,10 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           Log Workout
         </Link>
 
-        <Link
-          to="/compare"
-          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm transition-colors ml-1 ${
-            isActive('/compare')
-              ? 'bg-blue-500/10 text-blue-400 font-medium'
-              : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800'
-          }`}
-        >
-          Compare
-        </Link>
-
-        <Link
-          to="/library"
-          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm transition-colors ml-1 ${
-            isActive('/library')
-              ? 'bg-blue-500/10 text-blue-400 font-medium'
-              : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800'
-          }`}
-        >
-          Library
-        </Link>
+        {navLink('/cardio', 'Cardio', <RunIcon />)}
+        {navLink('/measurements', 'Measurements', <HeartIcon />)}
+        {navLink('/library', 'Library')}
+        {navLink('/settings', 'Settings')}
 
         <button
           onClick={() => { logout(); navigate('/login') }}
@@ -112,8 +115,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       {/* Mobile bottom nav */}
       <nav className="fixed bottom-0 left-0 right-0 md:hidden bg-slate-900/95 backdrop-blur border-t border-slate-800 z-20">
         <div className="flex items-end justify-around px-2 py-2">
-          {/* Left 2 items */}
-          {navItems.slice(0, 2).map((item) => (
+          {mobileBottomItems.slice(0, 2).map(item => (
             <Link
               key={item.to}
               to={item.to}
@@ -134,8 +136,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             <PlusIcon />
           </Link>
 
-          {/* Right 2 items */}
-          {navItems.slice(2).map((item) => (
+          {mobileBottomItems.slice(2).map(item => (
             <Link
               key={item.to}
               to={item.to}

@@ -14,7 +14,11 @@ class User(Base):
     is_admin = Column(Boolean, default=False, nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow)
 
+    unit_system = Column(String, nullable=False, default="imperial")  # 'imperial' | 'metric'
+
     workouts = relationship("Workout", back_populates="user", cascade="all, delete-orphan")
+    measurements = relationship("Measurement", back_populates="user", cascade="all, delete-orphan")
+    cardio_sessions = relationship("CardioSession", back_populates="user", cascade="all, delete-orphan")
 
 
 class Workout(Base):
@@ -115,3 +119,62 @@ class GlobalExercise(Base):
     muscles_secondary_ids = Column(Text, nullable=True)
     description = Column(Text, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
+
+
+class Measurement(Base):
+    __tablename__ = "measurements"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    date = Column(Date, nullable=False)
+    weight = Column(Float, nullable=True)       # stored in lbs
+    body_fat = Column(Float, nullable=True)     # percentage
+    chest = Column(Float, nullable=True)        # stored in cm
+    waist = Column(Float, nullable=True)
+    hips = Column(Float, nullable=True)
+    arms = Column(Float, nullable=True)
+    thighs = Column(Float, nullable=True)
+    neck = Column(Float, nullable=True)
+    notes = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    user = relationship("User", back_populates="measurements")
+
+
+class CardioSession(Base):
+    __tablename__ = "cardio_sessions"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    date = Column(Date, nullable=False)
+    name = Column(String, nullable=False)
+    activity_type = Column(String, nullable=False, default="run")  # run|swim|bike|hike|other
+    total_distance = Column(Float, nullable=True)   # stored in km
+    total_duration = Column(Float, nullable=True)   # stored in minutes
+    avg_hr = Column(Integer, nullable=True)
+    max_hr = Column(Integer, nullable=True)
+    calories = Column(Integer, nullable=True)
+    temperature = Column(Float, nullable=True)      # stored in °C
+    notes = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    user = relationship("User", back_populates="cardio_sessions")
+    segments = relationship("CardioSegment", back_populates="session", cascade="all, delete-orphan", order_by="CardioSegment.sort_order")
+
+
+class CardioSegment(Base):
+    __tablename__ = "cardio_segments"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    session_id = Column(Integer, ForeignKey("cardio_sessions.id", ondelete="CASCADE"), nullable=False)
+    sort_order = Column(Integer, nullable=False, default=0)
+    label = Column(String, nullable=True)
+    segment_type = Column(String, nullable=False, default="easy")  # warmup|easy|moderate|hard|interval|recovery|cool_down
+    distance = Column(Float, nullable=True)   # km
+    duration = Column(Float, nullable=True)   # minutes
+    pace = Column(Float, nullable=True)       # min/km as float (5.5 = 5:30/km)
+    hr = Column(Integer, nullable=True)
+    reps = Column(Integer, nullable=False, default=1)
+    notes = Column(Text, nullable=True)
+
+    session = relationship("CardioSession", back_populates="segments")

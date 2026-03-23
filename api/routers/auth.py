@@ -14,6 +14,7 @@ from api.schemas import (
     Token,
     UserLogin,
     UserRegister,
+    UserPreferencesUpdate,
     UserResponse,
 )
 from api.auth import hash_password, verify_password, create_access_token, get_current_user
@@ -106,6 +107,21 @@ def reset_password(body: ResetPasswordRequest, db: Session = Depends(get_db)):
 
 @router.get("/me", response_model=UserResponse)
 def me(current_user: User = Depends(get_current_user)):
+    return current_user
+
+
+@router.patch("/me/preferences", response_model=UserResponse)
+def update_preferences(
+    body: UserPreferencesUpdate,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    if body.unit_system not in ("imperial", "metric"):
+        from fastapi import HTTPException
+        raise HTTPException(status_code=400, detail="unit_system must be 'imperial' or 'metric'")
+    current_user.unit_system = body.unit_system
+    db.commit()
+    db.refresh(current_user)
     return current_user
 
 

@@ -35,3 +35,14 @@ export const updateExercise = (id: number, data: Partial<GlobalExercisePayload>)
 
 export const deleteExercise = (id: number) =>
   client.delete(`/library/${id}`)
+
+export interface ExerciseDBResult {
+  name: string
+  gif_url: string
+  body_part: string
+  target: string
+  secondary_muscles: string[]
+}
+
+export const searchExerciseDB = (q: string) =>
+  client.get<ExerciseDBResult[]>(`/library/exercisedb-search?q=${encodeURIComponent(q)}`)

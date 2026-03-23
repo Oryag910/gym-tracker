@@ -1,5 +1,7 @@
 import json
+import os
 
+import httpx
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
@@ -131,3 +133,40 @@ def delete_exercise(
         raise HTTPException(status_code=404, detail="Exercise not found")
     db.delete(ex)
     db.commit()
+
+
+@router.get("/exercisedb-search")
+async def exercisedb_search(
+    q: str = Query(..., min_length=1),
+    admin: User = Depends(_require_admin),
+):
+    """Proxy search to ExerciseDB API. Admin only — keeps API key server-side."""
+    api_key = os.getenv("RAPIDAPI_KEY", "")
+    if not api_key:
+        return []
+    try:
+        encoded = q.lower().strip().replace(" ", "%20")
+        async with httpx.AsyncClient(timeout=8.0) as client:
+            resp = await client.get(
+                f"https://exercisedb.p.rapidapi.com/exercises/name/{encoded}",
+                headers={
+                    "X-RapidAPI-Key": api_key,
+                    "X-RapidAPI-Host": "exercisedb.p.rapidapi.com",
+                },
+                params={"limit": "6", "offset": "0"},
+            )
+            if resp.status_code != 200:
+                return []
+            results = resp.json()
+            return [
+                {
+                    "name": ex["name"].title(),
+                    "gif_url": ex["gifUrl"],
+                    "body_part": ex["bodyPart"].title(),
+                    "target": ex["target"].title(),
+                    "secondary_muscles": ex.get("secondaryMuscles", []),
+                }
+                for ex in results[:6]
+            ]
+    except Exception:
+        return []

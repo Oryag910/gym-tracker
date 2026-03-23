@@ -1,12 +1,14 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   listExercises,
   createExercise,
   updateExercise,
   deleteExercise,
+  searchExerciseDB,
   type GlobalExercise,
   type GlobalExercisePayload,
+  type ExerciseDBResult,
 } from '../api/globalExercises'
 import { useAuth } from '../context/AuthContext'
 import MuscleMap from '../components/MuscleMap/MuscleMap'
@@ -120,14 +122,51 @@ function AdminForm({ initial, onSave, onCancel, saving }: {
   saving: boolean
 }) {
   const [form, setForm] = useState<FormState>(initial)
+  const [suggestions, setSuggestions] = useState<ExerciseDBResult[]>([])
+  const [showSuggestions, setShowSuggestions] = useState(false)
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const primaryIds = Object.entries(form.muscles).filter(([, s]) => s === 'primary').map(([id]) => Number(id))
   const secondaryIds = Object.entries(form.muscles).filter(([, s]) => s === 'secondary').map(([id]) => Number(id))
 
+  const handleNameChange = (value: string) => {
+    setForm(f => ({ ...f, name: value }))
+    if (debounceRef.current) clearTimeout(debounceRef.current)
+    if (value.trim().length < 3) { setSuggestions([]); setShowSuggestions(false); return }
+    debounceRef.current = setTimeout(async () => {
+      try {
+        const res = await searchExerciseDB(value.trim())
+        setSuggestions(res.data)
+        setShowSuggestions(res.data.length > 0)
+      } catch { setSuggestions([]); setShowSuggestions(false) }
+    }, 600)
+  }
+
+  const pickSuggestion = (s: ExerciseDBResult) => {
+    setForm(f => ({ ...f, name: s.name, image_url: s.gif_url }))
+    setSuggestions([])
+    setShowSuggestions(false)
+  }
+
   return (
     <div className={`${card} space-y-5`}>
-      <div>
+      <div className="relative">
         <label className="block text-xs font-medium text-slate-400 uppercase tracking-wide mb-1.5">Exercise Name</label>
-        <input className={input} value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} placeholder="e.g. Barbell Bench Press" autoFocus />
+        <input className={input} value={form.name} onChange={e => handleNameChange(e.target.value)} placeholder="e.g. Barbell Bench Press" autoFocus onBlur={() => setTimeout(() => setShowSuggestions(false), 150)} onFocus={() => suggestions.length > 0 && setShowSuggestions(true)} />
+        {showSuggestions && (
+          <div className="absolute z-20 top-full mt-1 left-0 right-0 bg-slate-800 border border-slate-700 rounded-xl shadow-xl overflow-hidden">
+            {suggestions.map((s, i) => (
+              <button key={i} type="button" onMouseDown={() => pickSuggestion(s)}
+                className="w-full flex items-center gap-3 px-3 py-2.5 hover:bg-slate-700/60 transition-colors text-left border-b border-slate-700/50 last:border-0"
+              >
+                <img src={s.gif_url} alt={s.name} className="w-10 h-10 object-cover rounded-lg bg-slate-700 shrink-0" />
+                <div>
+                  <div className="text-sm font-medium text-slate-200">{s.name}</div>
+                  <div className="text-[11px] text-slate-500">{s.body_part} · {s.target}</div>
+                </div>
+              </button>
+            ))}
+          </div>
+        )}
       </div>
       <div>
         <label className="block text-xs font-medium text-slate-400 uppercase tracking-wide mb-1.5">Category</label>

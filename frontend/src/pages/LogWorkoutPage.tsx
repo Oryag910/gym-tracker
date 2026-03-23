@@ -268,20 +268,25 @@ export default function LogWorkoutPage() {
                             Hide
                           </button>
                         </div>
-                        {ex.lookup.image_url && (
-                          <img
-                            src={ex.lookup.image_url}
-                            alt={ex.lookup.canonical_name ?? ex.name}
-                            className="h-28 object-cover rounded-lg mb-3 bg-slate-700"
-                            onError={e => { (e.target as HTMLImageElement).style.display = 'none' }}
-                          />
-                        )}
-                        <MuscleMap
-                          primary={ex.lookup.muscles_primary}
-                          secondary={ex.lookup.muscles_secondary}
-                          primaryIds={ex.lookup.muscles_primary_ids}
-                          secondaryIds={ex.lookup.muscles_secondary_ids}
-                        />
+                        <div className="flex gap-4 items-start mb-3">
+                          {ex.lookup.image_url && (
+                            <img
+                              src={ex.lookup.image_url}
+                              alt={ex.lookup.canonical_name ?? ex.name}
+                              className="flex-1 min-w-0 rounded-xl object-cover bg-slate-700"
+                              style={{ height: '200px' }}
+                              onError={e => { (e.target as HTMLImageElement).style.display = 'none' }}
+                            />
+                          )}
+                          <div className="shrink-0">
+                            <MuscleMap
+                              primary={ex.lookup.muscles_primary}
+                              secondary={ex.lookup.muscles_secondary}
+                              primaryIds={ex.lookup.muscles_primary_ids}
+                              secondaryIds={ex.lookup.muscles_secondary_ids}
+                            />
+                          </div>
+                        </div>
                         {ex.lookup.description && (
                           <LogTechniquePanel description={ex.lookup.description} category={ex.lookup.category} />
                         )}

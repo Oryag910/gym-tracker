@@ -15,11 +15,11 @@ interface Props {
   secondaryIds?: number[]
 }
 
-// wger static image URLs
-const FRONT_BASE = 'https://wger.de/static/images/muscles/muscular_system_front.png'
-const BACK_BASE = 'https://wger.de/static/images/muscles/muscular_system_back.png'
-const primaryOverlay = (id: number) => `https://wger.de/static/images/muscles/main/muscle-${id}.png`
-const secondaryOverlay = (id: number) => `https://wger.de/static/images/muscles/secondary/muscle-${id}.png`
+// wger static images — self-hosted in /public/muscles/ to avoid hotlink blocking
+const FRONT_BASE = '/muscles/muscular_system_front.png'
+const BACK_BASE = '/muscles/muscular_system_back.png'
+const primaryOverlay = (id: number) => `/muscles/main/muscle-${id}.png`
+const secondaryOverlay = (id: number) => `/muscles/secondary/muscle-${id}.png`
 
 // Which muscle IDs belong to each view
 const FRONT_IDS = new Set([1, 2, 3, 4, 9, 13])

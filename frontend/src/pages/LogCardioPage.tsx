@@ -8,9 +8,8 @@ import {
   fromInputDistance, distanceUnit,
   fromInputTemp, tempUnit,
   parsePace, paceUnit,
-  paceToDisplay,
 } from '../utils/units'
-import { card, input, btnPrimary, btnGhost, label } from '../styles/tokens'
+import { card, input, btnPrimary, label } from '../styles/tokens'
 import PageTransition from '../components/PageTransition'
 
 const today = () => new Date().toISOString().split('T')[0]

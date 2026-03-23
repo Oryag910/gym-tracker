@@ -9,7 +9,7 @@ import {
   toDisplayTemp, tempUnit,
   paceToDisplay, paceUnit,
 } from '../utils/units'
-import { card, skeleton, btnDanger, btnPrimary } from '../styles/tokens'
+import { card, skeleton, btnDanger } from '../styles/tokens'
 import PageTransition from '../components/PageTransition'
 
 const SEGMENT_COLORS: Record<string, string> = {
@@ -94,7 +94,6 @@ export default function CardioDetailPage() {
 
   const du = distanceUnit(unitSystem)
   const tu = tempUnit(unitSystem)
-  const pu = paceUnit(unitSystem)
 
   if (!session) return (
     <div className="space-y-4">

@@ -8,7 +8,7 @@ import MuscleMap from '../components/MuscleMap/MuscleMap'
 import { card, input, btnPrimary, btnGhost } from '../styles/tokens'
 import PageTransition from '../components/PageTransition'
 import { useAuth } from '../context/AuthContext'
-import { toDisplayWeight, fromInputWeight, weightUnit } from '../utils/units'
+import { fromInputWeight, weightUnit } from '../utils/units'
 
 function LogTechniquePanel({ description, category }: { description: string; category: string | null }) {
   const [expanded, setExpanded] = useState(false)

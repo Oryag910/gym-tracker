@@ -18,27 +18,28 @@ logger = logging.getLogger(__name__)
 WGER_BASE = "https://wger.de/api/v2"
 CACHE_TTL_DAYS = 30
 
-# wger muscle ID → our muscle name (corrected mapping)
+# wger muscle ID → our muscle name (verified against /api/v2/muscle/)
 MUSCLE_MAP = {
     1: "biceps",
     2: "shoulders",      # anterior deltoid
     3: "serratus",
     4: "chest",
     5: "triceps",
-    6: "hamstrings",     # biceps femoris
+    6: "abs",            # rectus abdominis
     7: "calves",         # gastrocnemius
     8: "glutes",
-    9: "quads",          # quadriceps
-    10: "lats",          # latissimus dorsi
-    11: "hamstrings",    # duplicate, merges with 6
-    12: "shoulders",     # deltoid (general)
-    13: "abs",           # rectus abdominis
-    14: "traps",         # trapezius
+    9: "traps",          # trapezius
+    10: "quads",         # quadriceps femoris
+    11: "hamstrings",    # biceps femoris
+    12: "lats",          # latissimus dorsi
+    13: "brachialis",
+    14: "obliques",      # obliquus externus abdominis
+    15: "soleus",        # secondary calf
 }
 
-# Which wger muscle IDs appear on front vs back diagram
-FRONT_IDS = {1, 2, 3, 4, 9, 13}
-BACK_IDS = {5, 6, 7, 8, 10, 11, 12, 14}
+# Which wger muscle IDs appear on front vs back diagram (verified against /api/v2/muscle/)
+FRONT_IDS = {1, 2, 3, 4, 6, 10, 13, 14}
+BACK_IDS = {5, 7, 8, 9, 11, 12, 15}
 
 
 def _normalize(name: str) -> str:

@@ -21,9 +21,9 @@ const BACK_BASE = '/muscles/muscular_system_back.svg'
 const primaryOverlay = (id: number) => `/muscles/main/muscle-${id}.svg`
 const secondaryOverlay = (id: number) => `/muscles/secondary/muscle-${id}.svg`
 
-// Which muscle IDs belong to each view
-const FRONT_IDS = new Set([1, 2, 3, 4, 9, 13])
-const BACK_IDS = new Set([5, 6, 7, 8, 10, 11, 12, 14])
+// Which muscle IDs belong to each view (verified against wger /api/v2/muscle/)
+const FRONT_IDS = new Set([1, 2, 3, 4, 6, 10, 13, 14])
+const BACK_IDS = new Set([5, 7, 8, 9, 11, 12, 15])
 
 function WgerDiagram({
   view, primaryIds, secondaryIds,

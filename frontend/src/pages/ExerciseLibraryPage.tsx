@@ -141,8 +141,9 @@ function AdminForm({ initial, onSave, onCancel, saving }: {
       res.data.muscles_primary_ids.forEach(id => { newMuscles[id] = 'primary' })
       res.data.muscles_secondary_ids.forEach(id => { newMuscles[id] = 'secondary' })
       setForm(prev => ({ ...prev, muscles: { ...prev.muscles, ...newMuscles } }))
-    } catch {
-      setSuggestError('Could not suggest muscles. Check AI key or try again.')
+    } catch (err: any) {
+      const detail = err?.response?.data?.detail
+      setSuggestError(detail ?? 'Could not suggest muscles — try again.')
     } finally {
       setSuggesting(false)
     }

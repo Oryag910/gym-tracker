@@ -3,6 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { getTemplate } from '../api/templates'
 import type { TemplateDetail, TemplateExerciseResponse } from '../api/templates'
 import { createWorkout } from '../api/workouts'
+import { listExercises, type GlobalExercise } from '../api/globalExercises'
 import { useAuth } from '../context/AuthContext'
 import { toDisplayWeight, fromInputWeight, weightUnit } from '../utils/units'
 import { card, input, btnPrimary } from '../styles/tokens'
@@ -154,10 +155,18 @@ export default function GuidedWorkoutPage() {
   const [savingError, setSavingError] = useState('')
   const [showExitModal, setShowExitModal] = useState(false)
 
+  // Exercises parked for later — shown as "do one now?" prompts
+  const [skippedQueue, setSkippedQueue] = useState<TemplateExerciseResponse[]>([])
+
+  // Add-exercise modal state
+  const [showAddModal, setShowAddModal] = useState(false)
+  const [addFilter, setAddFilter] = useState('')
+  const [addSets, setAddSets] = useState(3)
+  const [library, setLibrary] = useState<GlobalExercise[]>([])
+
   useEffect(() => {
-    getTemplate(Number(templateId)).then(r => {
-      setPhase({ kind: 'ready', template: r.data })
-    })
+    getTemplate(Number(templateId)).then(r => setPhase({ kind: 'ready', template: r.data }))
+    listExercises().then(r => setLibrary(r.data)).catch(() => {})
   }, [templateId])
 
   const beginWorkout = (template: TemplateDetail) => {
@@ -207,7 +216,6 @@ export default function GuidedWorkoutPage() {
     const moreExercises = exerciseIndex + 1 < template.exercises.length
 
     if (!moreSetsSameExercise && !moreExercises) {
-      // Done — go to summary
       setPhase({ kind: 'summary', template, completedSets: newCompleted, workoutName: template.name, date: today() })
       return
     }
@@ -259,15 +267,25 @@ export default function GuidedWorkoutPage() {
     goToActive(template, exerciseIndex + 1, 0, completedSets)
   }
 
-  // Skip this exercise but requeue it at the end so the user can come back
+  // Park this exercise for later — add to queue, skip immediately
   const skipExerciseReturnLater = (p: Extract<Phase, { kind: 'active' }>) => {
-    const { template, exerciseIndex, completedSets } = p
-    const currentEx = template.exercises[exerciseIndex]
-    // Append a copy with a temporary negative id (avoids React key collisions)
-    const requeued = { ...currentEx, id: -(Date.now()) }
-    const newExercises = [...template.exercises, requeued]
-    const newTemplate = { ...template, exercises: newExercises }
-    goToActive(newTemplate, exerciseIndex + 1, 0, completedSets)
+    setSkippedQueue(prev => [...prev, p.template.exercises[p.exerciseIndex]])
+    skipExercise(p)
+  }
+
+  // Insert a queued exercise at a specific index in the template, then go to it
+  const insertFromQueue = (
+    ex: TemplateExerciseResponse,
+    queueIdx: number,
+    insertAt: number,
+    template: TemplateDetail,
+    completedSets: CompletedSet[]
+  ) => {
+    const exs = [...template.exercises]
+    exs.splice(insertAt, 0, { ...ex, id: -(Date.now()) })
+    const newTemplate = { ...template, exercises: exs }
+    setSkippedQueue(prev => prev.filter((_, i) => i !== queueIdx))
+    goToActive(newTemplate, insertAt, 0, completedSets)
   }
 
   // Clone the last set's targets and append it to the current exercise plan
@@ -275,59 +293,65 @@ export default function GuidedWorkoutPage() {
     const { template, exerciseIndex } = p
     const ex = template.exercises[exerciseIndex]
     const lastSet = ex.sets[ex.sets.length - 1]
-    const newSet = { ...lastSet }
-    // Deep-clone the template so React re-renders
     const newExercises = template.exercises.map((e, i) =>
-      i === exerciseIndex ? { ...e, sets: [...e.sets, newSet] } : e
+      i === exerciseIndex ? { ...e, sets: [...e.sets, { ...lastSet }] } : e
     )
-    const newTemplate = { ...template, exercises: newExercises }
-    setPhase({ ...p, template: newTemplate })
+    setPhase({ ...p, template: { ...template, exercises: newExercises } })
+  }
+
+  // Add a brand-new exercise from the library mid-workout
+  const addExerciseMidWorkout = (name: string, sets: number, position: 'next' | 'end') => {
+    if (phase.kind !== 'active') return
+    const newSets = Array.from({ length: sets }, (_, i) => ({
+      id: -(Date.now() + i), set_number: i + 1,
+      target_weight: null, target_reps: null,
+    }))
+    const newEx: TemplateExerciseResponse = {
+      id: -Date.now(), name, order_index: 0,
+      set_rest_override: null, exercise_rest_override: null,
+      sets: newSets, is_unilateral: false, attachment: null,
+    }
+    const exs = [...phase.template.exercises]
+    const insertAt = position === 'next' ? phase.exerciseIndex + 1 : exs.length
+    exs.splice(insertAt, 0, newEx)
+    setPhase({ ...phase, template: { ...phase.template, exercises: exs } })
+    setShowAddModal(false)
+    setAddFilter('')
+    setAddSets(3)
   }
 
   const afterRest = (p: Extract<Phase, { kind: 'resting' }>) => {
     goToActive(p.template, p.nextExerciseIndex, p.nextSetIndex, p.completedSets)
   }
 
-  // Exit workout — if sets completed, offer save; otherwise go to summary or discard
+  // Exit workout — if sets completed, offer save; otherwise discard
   const exitWithSave = (completedSets: CompletedSet[], template: TemplateDetail) => {
     setShowExitModal(false)
-    if (completedSets.length === 0) {
-      navigate(-1)
-      return
-    }
+    if (completedSets.length === 0) { navigate(-1); return }
     setPhase({ kind: 'summary', template, completedSets, workoutName: template.name, date: today() })
   }
 
-  const exitDiscard = () => {
-    setShowExitModal(false)
-    navigate(-1)
-  }
+  const exitDiscard = () => { setShowExitModal(false); navigate(-1) }
 
   const saveWorkout = async (p: Extract<Phase, { kind: 'summary' }>) => {
     setPhase({ kind: 'saving' })
     setSavingError('')
     try {
-      // Group completed sets by exercise
       const exMap = new Map<number, CompletedSet[]>()
       p.completedSets.forEach(cs => {
         const arr = exMap.get(cs.exerciseIndex) ?? []
         arr.push(cs)
         exMap.set(cs.exerciseIndex, arr)
       })
-
       const exercises = Array.from(exMap.entries()).map(([, sets]) => ({
         name: sets[0].exerciseName,
         is_unilateral: sets[0].isUnilateral,
         attachment: sets[0].attachment,
         sets: sets.map(cs => ({
-          weight: cs.actualWeight,
-          reps: cs.actualReps,
-          rpe: cs.actualRpe,
-          weight_right: cs.actualWeightRight,
-          reps_right: cs.actualRepsRight,
+          weight: cs.actualWeight, reps: cs.actualReps, rpe: cs.actualRpe,
+          weight_right: cs.actualWeightRight, reps_right: cs.actualRepsRight,
         })),
       }))
-
       const res = await createWorkout({ name: p.workoutName, date: p.date, exercises })
       navigate(`/workouts/${res.data.id}`)
     } catch (err: any) {
@@ -393,7 +417,7 @@ export default function GuidedWorkoutPage() {
     )
   }
 
-  // Exit confirmation modal — rendered on top of whichever phase is active
+  // Exit confirmation modal — rendered on top of active/resting phases
   const exitModalCompletedSets = phase.kind === 'active' || phase.kind === 'resting' ? phase.completedSets : []
   const exitModalTemplate = phase.kind === 'active' || phase.kind === 'resting' ? phase.template : null
 
@@ -408,26 +432,80 @@ export default function GuidedWorkoutPage() {
         </p>
         <div className="space-y-2">
           {exitModalCompletedSets.length > 0 && (
-            <button
-              onClick={() => exitWithSave(exitModalCompletedSets, exitModalTemplate)}
-              className="w-full py-3 rounded-xl bg-blue-500 text-slate-950 font-bold hover:bg-blue-400 transition-colors"
-            >
+            <button onClick={() => exitWithSave(exitModalCompletedSets, exitModalTemplate)}
+              className="w-full py-3 rounded-xl bg-blue-500 text-slate-950 font-bold hover:bg-blue-400 transition-colors">
               Save what I've done
             </button>
           )}
-          <button
-            onClick={exitDiscard}
-            className="w-full py-3 rounded-xl border border-red-500/40 text-red-400 font-medium hover:bg-red-500/10 transition-colors"
-          >
+          <button onClick={exitDiscard}
+            className="w-full py-3 rounded-xl border border-red-500/40 text-red-400 font-medium hover:bg-red-500/10 transition-colors">
             Discard workout
           </button>
-          <button
-            onClick={() => setShowExitModal(false)}
-            className="w-full py-2.5 rounded-xl text-slate-500 hover:text-slate-300 text-sm transition-colors"
-          >
+          <button onClick={() => setShowExitModal(false)}
+            className="w-full py-2.5 rounded-xl text-slate-500 hover:text-slate-300 text-sm transition-colors">
             Keep going
           </button>
         </div>
+      </div>
+    </div>
+  ) : null
+
+  // Add exercise modal — full-screen overlay
+  const AddExerciseModal = () => showAddModal ? (
+    <div className="fixed inset-0 z-50 bg-slate-950/95 backdrop-blur-sm flex flex-col">
+      <div className="flex items-center justify-between px-4 pt-5 pb-3 border-b border-slate-800">
+        <h2 className="font-bold text-slate-100 text-lg">Add Exercise</h2>
+        <button onClick={() => { setShowAddModal(false); setAddFilter('') }}
+          className="text-slate-500 hover:text-slate-300 text-xl leading-none transition-colors">
+          ✕
+        </button>
+      </div>
+
+      {/* Search */}
+      <div className="px-4 py-3">
+        <input className={input} value={addFilter}
+          onChange={e => setAddFilter(e.target.value)}
+          placeholder="Search exercises..." autoFocus />
+      </div>
+
+      {/* Set count */}
+      <div className="px-4 pb-3 flex items-center gap-3">
+        <span className="text-slate-400 text-sm">Sets:</span>
+        <button onClick={() => setAddSets(s => Math.max(1, s - 1))}
+          className="w-7 h-7 rounded-lg bg-slate-800 text-slate-300 hover:bg-slate-700 transition-colors text-lg leading-none">
+          −
+        </button>
+        <span className="text-slate-100 font-bold w-5 text-center tabular-nums">{addSets}</span>
+        <button onClick={() => setAddSets(s => s + 1)}
+          className="w-7 h-7 rounded-lg bg-slate-800 text-slate-300 hover:bg-slate-700 transition-colors text-lg leading-none">
+          +
+        </button>
+        <span className="text-slate-600 text-xs ml-2">Tap Next or End to add</span>
+      </div>
+
+      {/* Exercise list */}
+      <div className="flex-1 overflow-y-auto px-4 pb-6">
+        {library
+          .filter(l => !addFilter.trim() || l.name.toLowerCase().includes(addFilter.toLowerCase()))
+          .slice(0, 40)
+          .map(l => (
+            <div key={l.id} className="flex items-center justify-between py-2.5 border-b border-slate-800/60">
+              <span className="text-slate-300 text-sm flex-1 mr-3">{l.name}</span>
+              <div className="flex gap-2 shrink-0">
+                <button onClick={() => addExerciseMidWorkout(l.name, addSets, 'next')}
+                  className="text-xs px-2.5 py-1.5 rounded-lg bg-blue-500 text-slate-950 font-bold hover:bg-blue-400 transition-colors">
+                  Next
+                </button>
+                <button onClick={() => addExerciseMidWorkout(l.name, addSets, 'end')}
+                  className="text-xs px-2.5 py-1.5 rounded-lg border border-slate-600 text-slate-400 hover:border-slate-500 hover:text-slate-300 transition-colors">
+                  End
+                </button>
+              </div>
+            </div>
+          ))}
+        {library.filter(l => !addFilter.trim() || l.name.toLowerCase().includes(addFilter.toLowerCase())).length === 0 && (
+          <div className="text-slate-500 text-sm text-center py-8">No exercises found</div>
+        )}
       </div>
     </div>
   ) : null
@@ -438,11 +516,14 @@ export default function GuidedWorkoutPage() {
     const s = ex.sets[setIndex]
     const total = totalSetCount(template.exercises)
     const done = completedSets.length
+    const hasMoreExercises = exerciseIndex + 1 < template.exercises.length
 
     return (
       <PageTransition>
         <ExitModal />
-        <div className="space-y-5 max-w-xl mx-auto">
+        <AddExerciseModal />
+        <div className="space-y-4 max-w-xl mx-auto">
+
           {/* Progress */}
           <div>
             <div className="flex items-center justify-between text-xs text-slate-500 mb-1.5">
@@ -454,6 +535,24 @@ export default function GuidedWorkoutPage() {
                 style={{ width: `${(done / total) * 100}%` }} />
             </div>
           </div>
+
+          {/* Parked exercises banner */}
+          {skippedQueue.length > 0 && (
+            <div className="bg-amber-500/5 border border-amber-500/20 rounded-xl p-3">
+              <div className="text-xs text-amber-400/70 uppercase tracking-wide mb-2">
+                Parked — insert one next?
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {skippedQueue.map((qex, i) => (
+                  <button key={i}
+                    onClick={() => insertFromQueue(qex, i, exerciseIndex + 1, template, completedSets)}
+                    className="text-xs px-2.5 py-1.5 rounded-lg border border-amber-500/30 text-amber-300 hover:bg-amber-500/10 transition-colors">
+                    ↩ {qex.name}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* Current set card */}
           <div className={card}>
@@ -470,7 +569,6 @@ export default function GuidedWorkoutPage() {
             )}
 
             {ex.is_unilateral ? (
-              /* Unilateral: L and R rows */
               <div className="space-y-3 mb-3">
                 <div className="grid grid-cols-2 gap-3">
                   <div>
@@ -514,80 +612,60 @@ export default function GuidedWorkoutPage() {
                 </div>
               </div>
             ) : (
-              /* Standard bilateral */
               <div className="grid grid-cols-2 gap-3 mb-3">
                 <div>
                   <label className="block text-xs text-slate-500 mb-1.5 uppercase tracking-wide">Reps</label>
-                  <input
-                    className={`${input} text-lg font-bold`}
-                    type="number" min="0"
+                  <input className={`${input} text-lg font-bold`} type="number" min="0"
                     value={actualReps}
                     onChange={e => setPhase({ ...phase, actualReps: e.target.value })}
-                    placeholder="reps"
-                    autoFocus
-                  />
+                    placeholder="reps" autoFocus />
                 </div>
                 <div>
                   <label className="block text-xs text-slate-500 mb-1.5 uppercase tracking-wide">Weight ({wt})</label>
-                  <input
-                    className={`${input} text-lg font-bold`}
-                    type="number" step="0.5" min="0"
+                  <input className={`${input} text-lg font-bold`} type="number" step="0.5" min="0"
                     value={actualWeight}
                     onChange={e => setPhase({ ...phase, actualWeight: e.target.value })}
-                    placeholder="BW"
-                  />
+                    placeholder="BW" />
                 </div>
               </div>
             )}
             <div className="mb-4">
               <label className="block text-xs text-slate-500 mb-1.5 uppercase tracking-wide">RPE <span className="normal-case text-slate-600">(1–10, optional)</span></label>
-              <input
-                className={input}
-                type="number" min="1" max="10"
+              <input className={input} type="number" min="1" max="10"
                 value={actualRpe}
                 onChange={e => setPhase({ ...phase, actualRpe: e.target.value })}
-                placeholder="—"
-              />
+                placeholder="—" />
             </div>
 
-            <button onClick={() => logSet(phase)}
-              className={`${btnPrimary} w-full py-3.5 text-base`}>
+            <button onClick={() => logSet(phase)} className={`${btnPrimary} w-full py-3.5 text-base`}>
               Log Set →
             </button>
 
             {/* Secondary actions */}
-            <div className="flex gap-2 mt-3">
-              <button
-                type="button"
-                onClick={() => skipSet(phase)}
-                className="flex-1 py-2 rounded-xl border border-slate-700 text-slate-400 text-sm hover:border-slate-500 hover:text-slate-300 transition-colors"
-              >
+            <div className="flex flex-wrap gap-2 mt-3">
+              <button type="button" onClick={() => skipSet(phase)}
+                className="flex-1 min-w-[80px] py-2 rounded-xl border border-slate-700 text-slate-400 text-sm hover:border-slate-500 hover:text-slate-300 transition-colors">
                 Skip Set
               </button>
-              {/* Return Later — always available, requeues at end */}
-              <button
-                type="button"
-                onClick={() => skipExerciseReturnLater(phase)}
-                className="flex-1 py-2 rounded-xl border border-slate-700 text-slate-400 text-sm hover:border-slate-500 hover:text-slate-300 transition-colors"
-              >
-                ↩ Return Later
-              </button>
-              {/* Skip completely — only when there's a next exercise */}
-              {exerciseIndex + 1 < template.exercises.length && (
-                <button
-                  type="button"
-                  onClick={() => skipExercise(phase)}
-                  className="flex-1 py-2 rounded-xl border border-slate-700 text-slate-400 text-sm hover:border-slate-500 hover:text-slate-300 transition-colors"
-                >
+              {hasMoreExercises && (
+                <button type="button" onClick={() => skipExerciseReturnLater(phase)}
+                  className="flex-1 min-w-[80px] py-2 rounded-xl border border-amber-500/30 text-amber-400/80 text-sm hover:bg-amber-500/10 transition-colors">
+                  ↩ Return Later
+                </button>
+              )}
+              {hasMoreExercises && (
+                <button type="button" onClick={() => skipExercise(phase)}
+                  className="flex-1 min-w-[80px] py-2 rounded-xl border border-slate-700 text-slate-400 text-sm hover:border-slate-500 hover:text-slate-300 transition-colors">
                   Skip
                 </button>
               )}
-              <button
-                type="button"
-                onClick={() => addExtraSet(phase)}
-                className="flex-1 py-2 rounded-xl border border-slate-700 text-slate-400 text-sm hover:border-slate-500 hover:text-slate-300 transition-colors"
-              >
-                + Add Set
+              <button type="button" onClick={() => addExtraSet(phase)}
+                className="flex-1 min-w-[80px] py-2 rounded-xl border border-slate-700 text-slate-400 text-sm hover:border-slate-500 hover:text-slate-300 transition-colors">
+                + Set
+              </button>
+              <button type="button" onClick={() => setShowAddModal(true)}
+                className="flex-1 min-w-[80px] py-2 rounded-xl border border-slate-700 text-slate-400 text-sm hover:border-blue-500/40 hover:text-blue-400 transition-colors">
+                ＋ Exercise
               </button>
             </div>
           </div>
@@ -597,7 +675,7 @@ export default function GuidedWorkoutPage() {
             <div className="text-center text-xs text-slate-500">
               Next: {ex.name} — Set {setIndex + 2} · Rest {ex.set_rest_override ?? template.default_set_rest}s after this set
             </div>
-          ) : exerciseIndex + 1 < template.exercises.length ? (
+          ) : hasMoreExercises ? (
             <div className="text-center text-xs text-slate-500">
               Next exercise: {template.exercises[exerciseIndex + 1].name} · Rest {ex.exercise_rest_override ?? template.default_exercise_rest}s after this set
             </div>
@@ -607,11 +685,8 @@ export default function GuidedWorkoutPage() {
 
           {/* Exit workout */}
           <div className="text-center">
-            <button
-              type="button"
-              onClick={() => setShowExitModal(true)}
-              className="text-slate-600 hover:text-red-400 text-xs transition-colors"
-            >
+            <button type="button" onClick={() => setShowExitModal(true)}
+              className="text-slate-600 hover:text-red-400 text-xs transition-colors">
               Exit workout
             </button>
           </div>
@@ -633,13 +708,31 @@ export default function GuidedWorkoutPage() {
               onSkip={() => afterRest(phase)}
               onAdd={sec => setSecondsLeftResting(prev => prev + sec)}
             />
+
+            {/* Parked exercises — offer to insert next during rest */}
+            {skippedQueue.length > 0 && (
+              <div className="mt-5 pt-4 border-t border-slate-700">
+                <div className="text-xs text-amber-400/70 uppercase tracking-wide mb-3">
+                  Machine free? Insert next:
+                </div>
+                <div className="space-y-2">
+                  {skippedQueue.map((qex, i) => (
+                    <div key={i} className="flex items-center justify-between gap-3">
+                      <span className="text-slate-300 text-sm">{qex.name}</span>
+                      <button
+                        onClick={() => insertFromQueue(qex, i, phase.nextExerciseIndex, phase.template, phase.completedSets)}
+                        className="shrink-0 text-xs px-3 py-1.5 rounded-lg border border-amber-500/30 text-amber-300 hover:bg-amber-500/10 transition-colors">
+                        Do Next
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
           <div className="text-center">
-            <button
-              type="button"
-              onClick={() => setShowExitModal(true)}
-              className="text-slate-600 hover:text-red-400 text-xs transition-colors"
-            >
+            <button type="button" onClick={() => setShowExitModal(true)}
+              className="text-slate-600 hover:text-red-400 text-xs transition-colors">
               Exit workout
             </button>
           </div>
@@ -650,7 +743,6 @@ export default function GuidedWorkoutPage() {
 
   if (phase.kind === 'summary') {
     const { completedSets, workoutName, date } = phase
-    // Group by exercise
     const grouped: Record<number, CompletedSet[]> = {}
     completedSets.forEach(cs => {
       grouped[cs.exerciseIndex] = grouped[cs.exerciseIndex] ?? []
@@ -666,7 +758,6 @@ export default function GuidedWorkoutPage() {
             <p className="text-slate-400 text-sm mt-1">{completedSets.length} sets logged</p>
           </div>
 
-          {/* Summary table */}
           <div className={card}>
             <h2 className="font-semibold text-slate-200 mb-3">Results</h2>
             <div className="space-y-4">
@@ -699,7 +790,6 @@ export default function GuidedWorkoutPage() {
             </div>
           </div>
 
-          {/* Save form */}
           <div className={card}>
             <h2 className="font-semibold text-slate-200 mb-3">Save to workout log</h2>
             <div className="space-y-3 mb-4">

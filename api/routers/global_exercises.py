@@ -2,7 +2,7 @@ import json
 import json as json_lib
 import os
 
-import anthropic
+import google.generativeai as genai
 import httpx
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
@@ -230,35 +230,33 @@ async def suggest_muscles(
     body: SuggestMusclesRequest,
     admin: User = Depends(_require_admin),
 ):
-    """Call Claude Haiku to suggest primary/secondary muscle IDs for an exercise. Admin only."""
-    api_key = os.environ.get("ANTHROPIC_API_KEY")
+    """Call Gemini Flash to suggest primary/secondary muscle IDs for an exercise. Admin only."""
+    api_key = os.environ.get("GEMINI_API_KEY")
     if not api_key:
-        raise HTTPException(status_code=503, detail="ANTHROPIC_API_KEY not configured")
+        raise HTTPException(status_code=503, detail="GEMINI_API_KEY not configured")
 
     muscle_list = "\n".join(f"{k}: {v}" for k, v in MUSCLE_MAP.items())
-    client = anthropic.Anthropic(api_key=api_key)
+    genai.configure(api_key=api_key)
+    model = genai.GenerativeModel("gemini-1.5-flash")
 
-    msg = client.messages.create(
-        model="claude-haiku-4-5-20251001",
-        max_tokens=256,
-        messages=[{
-            "role": "user",
-            "content": (
-                f'You are a fitness anatomy expert. For the exercise "{body.name}", '
-                f"identify which muscles are primarily and secondarily engaged.\n\n"
-                f"Available muscle IDs:\n{muscle_list}\n\n"
-                f'Respond with ONLY valid JSON: {{"primary": [list of integer IDs], "secondary": [list of integer IDs]}}\n\n'
-                f"Rules:\n"
-                f"- Primary: main movers (directly activated muscles)\n"
-                f"- Secondary: stabilisers and synergists\n"
-                f"- No muscle can appear in both lists\n"
-                f"- Only use IDs from the list above"
-            ),
-        }],
+    prompt = (
+        f'You are a fitness anatomy expert. For the exercise "{body.name}", '
+        f"identify which muscles are primarily and secondarily engaged.\n\n"
+        f"Available muscle IDs:\n{muscle_list}\n\n"
+        f'Respond with ONLY valid JSON: {{"primary": [list of integer IDs], "secondary": [list of integer IDs]}}\n\n'
+        f"Rules:\n"
+        f"- Primary: main movers (directly activated muscles)\n"
+        f"- Secondary: stabilisers and synergists\n"
+        f"- No muscle can appear in both lists\n"
+        f"- Only use IDs from the list above"
     )
 
+    response = model.generate_content(prompt)
+
     try:
-        result = json_lib.loads(msg.content[0].text.strip())
+        # Strip markdown code fences if Gemini wraps the JSON
+        text = response.text.strip().removeprefix("```json").removeprefix("```").removesuffix("```").strip()
+        result = json_lib.loads(text)
     except Exception:
         raise HTTPException(status_code=500, detail="Failed to parse AI response")
 

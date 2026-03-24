@@ -77,6 +77,7 @@ const RANGES: { label: string; days: number }[] = [
   { label: '30D', days: 30 },
   { label: '90D', days: 90 },
   { label: '1Y', days: 365 },
+  { label: 'All', days: 9999 },
 ]
 
 const MEASURE_FIELDS: { key: keyof MeasurementEntry; label: string }[] = [
@@ -193,6 +194,8 @@ export default function AnalyticsPage() {
 
   // Volume
   const [volume, setVolume] = useState<VolumePoint[]>([])
+  const [volumeRange, setVolumeRange] = useState(90)
+  const [volumeWorkout, setVolumeWorkout] = useState<string>('all')
   const [loading, setLoading] = useState(true)
 
   // PR Progress
@@ -202,12 +205,16 @@ export default function AnalyticsPage() {
   const [prExercise, setPrExercise] = useState('')
   const [prRange, setPrRange] = useState(30)
   const [prLoading, setPrLoading] = useState(false)
+  const [prFilter, setPrFilter] = useState('')
+  const [prShowPicker, setPrShowPicker] = useState(false)
+  const [prListLoading, setPrListLoading] = useState(false)
 
   // Exercise Trend (dropdown)
   const [trendExercise, setTrendExercise] = useState('')
   const [trendFilter, setTrendFilter] = useState('')
   const [trendShowPicker, setTrendShowPicker] = useState(false)
   const [trend, setTrend] = useState<TrendPoint[]>([])
+  const [trendRange, setTrendRange] = useState(90)
   const [trendLoading, setTrendLoading] = useState(false)
 
   // Exercise Volume (dropdown + range)
@@ -233,16 +240,14 @@ export default function AnalyticsPage() {
   const du = distanceUnit(units.distance)
   const mt = measureUnit(units.measure)
 
+  // Initial load — PRs are excluded here to speed up the first paint.
+  // They load lazily when the user navigates to the PR tab (see effect below).
   useEffect(() => {
     Promise.all([
-      getVolume(), getPRs(), listExercises(),
+      getVolume(), listExercises(),
       getMeasurements(), getCardioSessions(),
-    ]).then(([vRes, prRes, libRes, measRes, cardioRes]) => {
+    ]).then(([vRes, libRes, measRes, cardioRes]) => {
       setVolume(vRes.data)
-      const map: Record<string, number> = {}
-      prRes.data.forEach((p: PREntry) => { map[p.exercise.toLowerCase()] = p.weight })
-      setPrMap(map)
-      setPrList(prRes.data)
       setLibrary(libRes.data)
       setMeasurements(measRes.data.slice().reverse()) // oldest first for chart
       setCardioSessions(cardioRes.data.slice().reverse())
@@ -250,7 +255,20 @@ export default function AnalyticsPage() {
     })
   }, [])
 
-  // Auto-load first PR exercise
+  // Lazy PR load — only fires when the user navigates to the PR tab
+  useEffect(() => {
+    if (tab !== 'prs' || prList.length > 0 || prListLoading) return
+    setPrListLoading(true)
+    getPRs().then(r => {
+      const map: Record<string, number> = {}
+      r.data.forEach((p: PREntry) => { map[p.exercise.toLowerCase()] = p.weight })
+      setPrMap(map)
+      setPrList(r.data)
+      setPrListLoading(false)
+    })
+  }, [tab])
+
+  // Auto-load first PR exercise once the PR list arrives
   useEffect(() => {
     if (prList.length > 0 && !prExercise) loadPRHistory(prList[0].exercise)
   }, [prList])
@@ -274,8 +292,17 @@ export default function AnalyticsPage() {
   }
 
   // Filtered data
+  const volumeCutoff = cutoffDate(volumeRange)
+  const volumeWorkoutNames = [...new Set(volume.map(v => v.workout_name))].sort()
+  const filteredVolume = volume
+    .filter(v => new Date(v.date) >= volumeCutoff)
+    .filter(v => volumeWorkout === 'all' || v.workout_name === volumeWorkout)
+
   const prCutoff = cutoffDate(prRange)
   const filteredPRHistory = prHistory.filter(p => new Date(p.date) >= prCutoff)
+
+  const trendCutoff = cutoffDate(trendRange)
+  const filteredTrend = trend.filter(t => new Date(t.date) >= trendCutoff)
 
   const exVolCutoff = cutoffDate(exVolRange)
   const filteredExVol = exVolTrend
@@ -348,21 +375,48 @@ export default function AnalyticsPage() {
             ) : volume.length === 0 ? (
               <p className="text-slate-500 text-center py-10">No data yet.</p>
             ) : (
-              <ResponsiveContainer width="100%" height={260}>
-                <AreaChart data={volume.map(v => ({ date: v.date, volume: Math.round(toDisplayWeight(v.volume, units.weight)), name: v.workout_name }))}>
-                  <defs>
-                    <linearGradient id="volGrad" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#34d399" stopOpacity={0.35} />
-                      <stop offset="95%" stopColor="#34d399" stopOpacity={0} />
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid stroke="#1e293b" strokeDasharray="4 4" />
-                  <XAxis dataKey="date" tick={{ fill: '#64748b', fontSize: 12 }} />
-                  <YAxis tick={{ fill: '#64748b', fontSize: 12 }} unit={` ${wt}`} width={70} />
-                  <Tooltip content={<VolumeTooltip unit={wt} />} />
-                  <Area type="monotone" dataKey="volume" stroke="#34d399" strokeWidth={2.5} fill="url(#volGrad)" dot={{ fill: '#34d399', r: 3 }} />
-                </AreaChart>
-              </ResponsiveContainer>
+              <>
+                {/* Workout type filter — pills built from unique workout names in the data */}
+                <div className="flex flex-wrap gap-2 mb-4">
+                  <button onClick={() => setVolumeWorkout('all')}
+                    className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-colors shrink-0 ${
+                      volumeWorkout === 'all'
+                        ? 'bg-emerald-500/20 border-emerald-500/50 text-emerald-300'
+                        : 'bg-slate-800 border-slate-700 text-slate-400 hover:text-slate-200'
+                    }`}>All</button>
+                  {volumeWorkoutNames.map(name => (
+                    <button key={name} onClick={() => setVolumeWorkout(name)}
+                      className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-colors shrink-0 ${
+                        volumeWorkout === name
+                          ? 'bg-emerald-500/20 border-emerald-500/50 text-emerald-300'
+                          : 'bg-slate-800 border-slate-700 text-slate-400 hover:text-slate-200'
+                      }`}>{name}</button>
+                  ))}
+                </div>
+                <RangeButtons range={volumeRange} setRange={setVolumeRange} />
+                {filteredVolume.length === 0 ? (
+                  <div className="text-center py-12">
+                    <p className="text-slate-500 text-sm">No data in this period.</p>
+                    <p className="text-slate-600 text-xs mt-1">Try a wider time range or different workout type.</p>
+                  </div>
+                ) : (
+                  <ResponsiveContainer width="100%" height={260}>
+                    <AreaChart data={filteredVolume.map(v => ({ date: v.date, volume: Math.round(toDisplayWeight(v.volume, units.weight)), name: v.workout_name }))}>
+                      <defs>
+                        <linearGradient id="volGrad" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor="#34d399" stopOpacity={0.35} />
+                          <stop offset="95%" stopColor="#34d399" stopOpacity={0} />
+                        </linearGradient>
+                      </defs>
+                      <CartesianGrid stroke="#1e293b" strokeDasharray="4 4" />
+                      <XAxis dataKey="date" tick={{ fill: '#64748b', fontSize: 12 }} />
+                      <YAxis tick={{ fill: '#64748b', fontSize: 12 }} unit={` ${wt}`} width={70} />
+                      <Tooltip content={<VolumeTooltip unit={wt} />} />
+                      <Area type="monotone" dataKey="volume" stroke="#34d399" strokeWidth={2.5} fill="url(#volGrad)" dot={{ fill: '#34d399', r: 3 }} />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                )}
+              </>
             )}
           </div>
         )}
@@ -419,24 +473,48 @@ export default function AnalyticsPage() {
         {tab === 'prs' && (
           <div className={card}>
             <h2 className="font-semibold text-slate-200 mb-4">PR Progress</h2>
-            {loading ? (
+            {loading || prListLoading ? (
               <div className={`${skeleton} h-56`} />
             ) : prList.length === 0 ? (
               <p className="text-slate-500 text-center py-10">Log some workouts to see your PRs.</p>
             ) : (
               <>
-                <div className="flex flex-wrap gap-2 mb-4">
-                  {prList.map(p => (
-                    <button key={p.exercise} onClick={() => loadPRHistory(p.exercise)}
-                      className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ${
-                        prExercise === p.exercise
-                          ? 'bg-amber-500/20 border-amber-500/50 text-amber-300'
-                          : 'bg-slate-800 border-slate-700 text-slate-400 hover:text-slate-200 hover:border-slate-500'
-                      }`}>
-                      {p.exercise}
+                {/* Exercise picker — replaces pill buttons */}
+                {prExercise ? (
+                  <div className="flex items-center gap-2 mb-4">
+                    <div className={`${input} flex-1 text-slate-100 cursor-default capitalize`}>{prExercise}</div>
+                    <button type="button"
+                      onClick={() => { setPrExercise(''); setPrHistory([]) }}
+                      className="text-xs text-slate-500 hover:text-blue-400 transition-colors shrink-0">
+                      Change
                     </button>
-                  ))}
-                </div>
+                  </div>
+                ) : (
+                  <div className="relative mb-4">
+                    <input
+                      className={input}
+                      value={prFilter}
+                      onChange={e => setPrFilter(e.target.value)}
+                      onFocus={() => setPrShowPicker(true)}
+                      onBlur={() => setTimeout(() => setPrShowPicker(false), 150)}
+                      placeholder="Search exercises..."
+                    />
+                    {prShowPicker && (
+                      <div className="absolute z-20 top-full mt-1 left-0 right-0 bg-slate-800 border border-slate-700 rounded-xl shadow-xl overflow-hidden max-h-52 overflow-y-auto">
+                        {prList
+                          .filter(p => prFilter.trim() === '' || p.exercise.toLowerCase().includes(prFilter.toLowerCase()))
+                          .map(p => (
+                            <button key={p.exercise} type="button"
+                              onMouseDown={() => { setPrFilter(''); setPrShowPicker(false); loadPRHistory(p.exercise) }}
+                              className="w-full flex items-center justify-between px-3 py-2.5 hover:bg-slate-700/60 transition-colors text-left border-b border-slate-700/50 last:border-0">
+                              <span className="text-sm text-slate-200 capitalize">{p.exercise}</span>
+                              <span className="text-xs text-amber-400 font-medium">{p.weight} lbs</span>
+                            </button>
+                          ))}
+                      </div>
+                    )}
+                  </div>
+                )}
                 <RangeButtons range={prRange} setRange={setPrRange} />
                 {prLoading ? (
                   <div className={`${skeleton} h-56`} />
@@ -494,21 +572,29 @@ export default function AnalyticsPage() {
             ) : (
               <>
                 <div className="text-slate-400 text-sm mb-3 capitalize font-medium">{trendExercise}</div>
-                <ResponsiveContainer width="100%" height={260}>
-                  <LineChart data={trend.map(t => ({ date: t.date, 'Max Weight': t.max_weight, 'Volume': Math.round(t.total_volume) }))}>
-                    <CartesianGrid stroke="#1e293b" strokeDasharray="4 4" />
-                    <XAxis dataKey="date" tick={{ fill: '#64748b', fontSize: 12 }} />
-                    <YAxis tick={{ fill: '#64748b', fontSize: 12 }} />
-                    <Tooltip content={<TrendTooltip />} />
-                    <Legend />
-                    {pr && (
-                      <ReferenceLine y={pr} stroke="#f59e0b" strokeDasharray="5 5"
-                        label={{ value: 'PR', fill: '#f59e0b', fontSize: 11 }} />
-                    )}
-                    <Line type="monotone" dataKey="Max Weight" stroke="#60a5fa" strokeWidth={2.5} dot={{ fill: '#60a5fa', r: 3 }} unit=" lbs" />
-                    <Line type="monotone" dataKey="Volume" stroke="#f59e0b" strokeWidth={2} dot={{ fill: '#f59e0b', r: 3 }} unit=" lbs" />
-                  </LineChart>
-                </ResponsiveContainer>
+                <RangeButtons range={trendRange} setRange={setTrendRange} />
+                {filteredTrend.length === 0 ? (
+                  <div className="text-center py-12">
+                    <p className="text-slate-500 text-sm">No data in this period.</p>
+                    <p className="text-slate-600 text-xs mt-1">Try a wider time range.</p>
+                  </div>
+                ) : (
+                  <ResponsiveContainer width="100%" height={260}>
+                    <LineChart data={filteredTrend.map(t => ({ date: t.date, 'Max Weight': t.max_weight, 'Volume': Math.round(t.total_volume) }))}>
+                      <CartesianGrid stroke="#1e293b" strokeDasharray="4 4" />
+                      <XAxis dataKey="date" tick={{ fill: '#64748b', fontSize: 12 }} />
+                      <YAxis tick={{ fill: '#64748b', fontSize: 12 }} />
+                      <Tooltip content={<TrendTooltip />} />
+                      <Legend />
+                      {pr && (
+                        <ReferenceLine y={pr} stroke="#f59e0b" strokeDasharray="5 5"
+                          label={{ value: 'PR', fill: '#f59e0b', fontSize: 11 }} />
+                      )}
+                      <Line type="monotone" dataKey="Max Weight" stroke="#60a5fa" strokeWidth={2.5} dot={{ fill: '#60a5fa', r: 3 }} unit=" lbs" />
+                      <Line type="monotone" dataKey="Volume" stroke="#f59e0b" strokeWidth={2} dot={{ fill: '#f59e0b', r: 3 }} unit=" lbs" />
+                    </LineChart>
+                  </ResponsiveContainer>
+                )}
               </>
             )}
           </div>

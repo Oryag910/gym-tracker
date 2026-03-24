@@ -1,10 +1,8 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { listWorkouts } from '../api/workouts'
-import type { WorkoutSummary } from '../api/workouts'
-import { getVolume } from '../api/stats'
-import type { VolumePoint } from '../api/stats'
+import { getDashboard } from '../api/stats'
+import type { DashboardData } from '../api/stats'
 import { card, skeleton, btnPrimary } from '../styles/tokens'
 import PageTransition from '../components/PageTransition'
 
@@ -24,20 +22,17 @@ function StatCard({ label, value, sub, loading }: { label: string; value: string
 }
 
 export default function DashboardPage() {
-  const [workouts, setWorkouts] = useState<WorkoutSummary[]>([])
-  const [totalVolume, setTotalVolume] = useState(0)
+  const [dash, setDash] = useState<DashboardData | null>(null)
   const [loading, setLoading] = useState(true)
   const navigate = useNavigate()
 
   useEffect(() => {
-    Promise.all([listWorkouts(), getVolume()]).then(([wRes, vRes]) => {
-      setWorkouts(wRes.data)
-      setTotalVolume(vRes.data.reduce((s: number, v: VolumePoint) => s + v.volume, 0))
-      setLoading(false)
-    })
+    // Single lightweight endpoint — replaces listWorkouts() + getVolume() which
+    // previously downloaded all 302 workout rows just to count and sum them.
+    getDashboard().then(r => { setDash(r.data); setLoading(false) })
   }, [])
 
-  const recent = workouts.slice(0, 5)
+  const recent = dash?.recent ?? []
 
   return (
     <PageTransition>
@@ -63,23 +58,18 @@ export default function DashboardPage() {
         <div className="flex gap-4 flex-wrap">
           <StatCard
             label="Total Workouts"
-            value={loading ? '—' : workouts.length.toString()}
+            value={loading ? '—' : (dash?.total_workouts ?? 0).toString()}
             loading={loading}
           />
           <StatCard
             label="Total Volume"
-            value={loading ? '—' : `${Math.round(totalVolume).toLocaleString()}`}
+            value={loading ? '—' : Math.round(dash?.total_volume ?? 0).toLocaleString()}
             sub="lbs lifted"
             loading={loading}
           />
           <StatCard
             label="This Week"
-            value={loading ? '—' : workouts.filter(w => {
-              const d = new Date(w.date)
-              const now = new Date()
-              const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
-              return d >= weekAgo
-            }).length.toString()}
+            value={loading ? '—' : (dash?.this_week ?? 0).toString()}
             sub="sessions"
             loading={loading}
           />

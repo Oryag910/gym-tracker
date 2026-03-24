@@ -31,7 +31,7 @@ class Workout(Base):
     __tablename__ = "workouts"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
     name = Column(String, nullable=False)
     date = Column(Date, nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow)
@@ -44,7 +44,7 @@ class Exercise(Base):
     __tablename__ = "exercises"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    workout_id = Column(Integer, ForeignKey("workouts.id", ondelete="CASCADE"), nullable=False)
+    workout_id = Column(Integer, ForeignKey("workouts.id", ondelete="CASCADE"), nullable=False, index=True)
     name = Column(String, nullable=False)
     order_index = Column(Integer, nullable=False, default=0)
 
@@ -56,7 +56,7 @@ class Set(Base):
     __tablename__ = "sets"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    exercise_id = Column(Integer, ForeignKey("exercises.id", ondelete="CASCADE"), nullable=False)
+    exercise_id = Column(Integer, ForeignKey("exercises.id", ondelete="CASCADE"), nullable=False, index=True)
     weight = Column(Float, nullable=True)
     reps = Column(Integer, nullable=True)
     rpe = Column(Integer, nullable=True)   # 1–10

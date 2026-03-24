@@ -20,3 +20,12 @@ export const getPRHistory = (exercise: string) => client.get<PRHistoryPoint[]>(`
 export const getVolume = () => client.get<VolumePoint[]>('/stats/volume')
 export const getExerciseTrend = (exercise: string) => client.get<TrendPoint[]>(`/stats/exercise/${encodeURIComponent(exercise)}/trend`)
 export const compareWorkouts = (a: number, b: number) => client.get<CompareResponse>(`/stats/compare?workout_a=${a}&workout_b=${b}`)
+
+export interface DashboardData {
+  total_workouts: number
+  this_week: number
+  total_volume: number
+  recent: { id: number; name: string; date: string; exercise_count: number }[]
+}
+
+export const getDashboard = () => client.get<DashboardData>('/stats/dashboard')

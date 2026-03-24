@@ -32,6 +32,21 @@ _migrations = [
     ("users", "pref_temp",        "VARCHAR"),
     ("sets",  "rpe",              "INTEGER"),
 ]
+# Create indexes for performance (safe to run multiple times)
+_index_migrations = [
+    "CREATE INDEX IF NOT EXISTS ix_workouts_user_id ON workouts (user_id)",
+    "CREATE INDEX IF NOT EXISTS ix_exercises_workout_id ON exercises (workout_id)",
+    "CREATE INDEX IF NOT EXISTS ix_sets_exercise_id ON sets (exercise_id)",
+]
+with engine.connect() as _conn:
+    for _sql in _index_migrations:
+        try:
+            _conn.execute(_text(_sql))
+            _conn.commit()
+        except Exception as _e:
+            _conn.rollback()
+            _log.warning("index migration warning: %s", _e)
+
 with engine.connect() as _conn:
     for _table, _col, _type in _migrations:
         try:

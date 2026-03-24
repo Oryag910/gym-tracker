@@ -9,7 +9,10 @@ export interface ExerciseResponse { id: number; name: string; order_index: numbe
 export interface WorkoutSummary { id: number; name: string; date: string; exercise_count: number }
 export interface WorkoutDetail { id: number; name: string; date: string; exercises: ExerciseResponse[] }
 
-export const listWorkouts = () => client.get<WorkoutSummary[]>('/workouts')
+export const listWorkouts = (limit = 0, offset = 0) => {
+  const params = limit > 0 ? `?limit=${limit}&offset=${offset}` : ''
+  return client.get<WorkoutSummary[]>(`/workouts${params}`)
+}
 export const getWorkout = (id: number) => client.get<WorkoutDetail>(`/workouts/${id}`)
 export const createWorkout = (data: WorkoutCreate) => client.post<WorkoutDetail>('/workouts', data)
 export const updateWorkout = (id: number, data: { name?: string; date?: string }) =>

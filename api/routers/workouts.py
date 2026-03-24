@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 
 from api.database import get_db
 from api.models import User, Workout, Exercise, Set
@@ -19,14 +19,23 @@ def _to_summary(workout: Workout) -> WorkoutSummary:
 
 
 @router.get("", response_model=list[WorkoutSummary])
-def list_workouts(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
-    workouts = (
+def list_workouts(
+    limit: int = 0,
+    offset: int = 0,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    # limit=0 means no limit — preserves backward-compat for callers that don't pass params.
+    # WorkoutsPage passes limit=20 for pagination.
+    q = (
         db.query(Workout)
+        .options(joinedload(Workout.exercises))
         .filter(Workout.user_id == current_user.id)
         .order_by(Workout.date.desc(), Workout.created_at.desc())
-        .all()
     )
-    return [_to_summary(w) for w in workouts]
+    if limit > 0:
+        q = q.limit(limit).offset(offset)
+    return [_to_summary(w) for w in q.all()]
 
 
 @router.post("", response_model=WorkoutResponse, status_code=201)

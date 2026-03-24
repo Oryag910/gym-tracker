@@ -6,6 +6,8 @@ import type { WorkoutSummary } from '../api/workouts'
 import { btnPrimary, skeleton } from '../styles/tokens'
 import PageTransition from '../components/PageTransition'
 
+const PAGE = 20
+
 function groupByMonth(workouts: WorkoutSummary[]) {
   const groups: Record<string, WorkoutSummary[]> = {}
   for (const w of workouts) {
@@ -26,11 +28,31 @@ export default function WorkoutsPage() {
   const [workouts, setWorkouts] = useState<WorkoutSummary[]>([])
   const [search, setSearch] = useState('')
   const [loading, setLoading] = useState(true)
+  // Tracks how many items we've loaded so far (used to calculate next offset)
+  const [loadedCount, setLoadedCount] = useState(0)
+  // True as long as the last batch was a full page (meaning there may be more)
+  const [hasMore, setHasMore] = useState(true)
+  const [loadingMore, setLoadingMore] = useState(false)
   const navigate = useNavigate()
 
   useEffect(() => {
-    listWorkouts().then((r) => { setWorkouts(r.data); setLoading(false) })
+    listWorkouts(PAGE, 0).then(r => {
+      setWorkouts(r.data)
+      setLoadedCount(r.data.length)
+      setHasMore(r.data.length === PAGE)
+      setLoading(false)
+    })
   }, [])
+
+  const loadMore = () => {
+    setLoadingMore(true)
+    listWorkouts(PAGE, loadedCount).then(r => {
+      setWorkouts(prev => [...prev, ...r.data])
+      setLoadedCount(prev => prev + r.data.length)
+      setHasMore(r.data.length === PAGE)
+      setLoadingMore(false)
+    })
+  }
 
   const filtered = workouts.filter(w => w.name.toLowerCase().includes(search.toLowerCase()))
   const grouped = groupByMonth(filtered)
@@ -98,6 +120,23 @@ export default function WorkoutsPage() {
                 </div>
               </div>
             ))}
+
+            {/* Load More — only shown when there may be more and no active search */}
+            {!search && (
+              hasMore ? (
+                <div className="pt-2 text-center">
+                  <button
+                    onClick={loadMore}
+                    disabled={loadingMore}
+                    className="px-6 py-2.5 rounded-xl text-sm font-medium bg-slate-800 border border-slate-700 text-slate-300 hover:border-blue-400/40 hover:text-slate-100 disabled:opacity-50 transition-colors"
+                  >
+                    {loadingMore ? 'Loading…' : 'Load More'}
+                  </button>
+                </div>
+              ) : loadedCount > PAGE ? (
+                <p className="text-center text-xs text-slate-600 py-2">All {loadedCount} workouts loaded</p>
+              ) : null
+            )}
           </div>
         )}
       </div>

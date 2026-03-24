@@ -23,6 +23,7 @@ export default function PRPage() {
   const [selected, setSelected] = useState<string | null>(null)
   const [history, setHistory] = useState<PRHistoryPoint[]>([])
   const [loading, setLoading] = useState(true)
+  const [search, setSearch] = useState('')
 
   useEffect(() => {
     getPRs().then((r) => { setPRs(r.data); setLoading(false) })
@@ -40,6 +41,16 @@ export default function PRPage() {
       <div className="space-y-6">
         <h1 className="text-2xl font-black text-slate-100 tracking-tight">Personal Records</h1>
 
+        {/* Search */}
+        {!loading && prs.length > 0 && (
+          <input
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            placeholder="Search exercises..."
+            className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-slate-100 placeholder:text-slate-500 focus:border-blue-400 focus:outline-none transition-colors"
+          />
+        )}
+
         {loading ? (
           <div className="space-y-3">
             {[1, 2, 3].map(i => <div key={i} className={`${skeleton} h-20`} />)}
@@ -52,14 +63,16 @@ export default function PRPage() {
           </div>
         ) : (
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {prs.map((pr, i) => (
+            {prs
+              .filter(pr => pr.exercise.toLowerCase().includes(search.toLowerCase()))
+              .map((pr, i) => (
               <motion.div
                 key={pr.exercise}
                 layout
                 layoutId={`pr-${pr.exercise}`}
                 initial={{ opacity: 0, scale: 0.95 }}
                 animate={{ opacity: 1, scale: 1 }}
-                transition={{ delay: i * 0.04 }}
+                transition={{ delay: i * 0.02 }}
                 onClick={() => handleSelect(pr.exercise)}
                 className={`bg-slate-800 border rounded-xl p-4 cursor-pointer transition-colors ${
                   selected === pr.exercise

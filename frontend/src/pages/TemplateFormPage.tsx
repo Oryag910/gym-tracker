@@ -24,12 +24,15 @@ interface TemplateExerciseForm {
   filter: string
   showPicker: boolean
   showRestConfig: boolean
+  is_unilateral: boolean
+  attachment: string
 }
 
 const emptyExercise = (): TemplateExerciseForm => ({
   name: '', sets: [{ target_weight: '', target_reps: '' }],
   set_rest_override: '', exercise_rest_override: '',
   lookup: null, filter: '', showPicker: false, showRestConfig: false,
+  is_unilateral: false, attachment: '',
 })
 
 function libraryToLookup(ex: GlobalExercise): ExerciseLookup {
@@ -77,6 +80,7 @@ export default function TemplateFormPage() {
           set_rest_override: ex.set_rest_override != null ? String(ex.set_rest_override) : '',
           exercise_rest_override: ex.exercise_rest_override != null ? String(ex.exercise_rest_override) : '',
           lookup: null, filter: '', showPicker: false, showRestConfig: false,
+          is_unilateral: ex.is_unilateral, attachment: ex.attachment ?? '',
         })))
         setLoading(false)
       })
@@ -119,6 +123,8 @@ export default function TemplateFormPage() {
         exercises: exercises.map((ex, idx) => ({
           name: ex.name,
           order_index: idx,
+          is_unilateral: ex.is_unilateral,
+          attachment: ex.attachment || null,
           set_rest_override: ex.set_rest_override ? parseInt(ex.set_rest_override) : null,
           exercise_rest_override: ex.exercise_rest_override ? parseInt(ex.exercise_rest_override) : null,
           sets: ex.sets.map((s, si) => ({
@@ -247,6 +253,29 @@ export default function TemplateFormPage() {
                       </button>
                     )}
                   </div>
+
+                  {/* Attachment + unilateral toggle */}
+                  {ex.name && (
+                    <div className="flex items-center gap-3 mb-4">
+                      <input
+                        className={`${input} flex-1 text-sm`}
+                        value={ex.attachment}
+                        onChange={e => updateExercise(ei, { attachment: e.target.value })}
+                        placeholder="Attachment (e.g. D-handle, cuff, rope...)"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => updateExercise(ei, { is_unilateral: !ex.is_unilateral })}
+                        className={`shrink-0 px-3 py-2 rounded-xl text-xs font-medium border transition-colors ${
+                          ex.is_unilateral
+                            ? 'bg-blue-500/20 border-blue-400/60 text-blue-300'
+                            : 'border-slate-600 text-slate-500 hover:border-slate-500'
+                        }`}
+                      >
+                        Unilateral
+                      </button>
+                    </div>
+                  )}
 
                   {/* Muscle map */}
                   {ex.lookup && (ex.lookup.muscles_primary_ids.length > 0 || ex.lookup.muscles_secondary_ids.length > 0) && (

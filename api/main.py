@@ -35,6 +35,8 @@ _migrations = [
     ("exercises", "attachment",    "VARCHAR"),
     ("sets",      "weight_right",  "REAL"),
     ("sets",      "reps_right",    "INTEGER"),
+    ("template_exercises", "is_unilateral", "BOOLEAN DEFAULT FALSE"),
+    ("template_exercises", "attachment",    "VARCHAR"),
 ]
 # Create indexes for performance (safe to run multiple times)
 _index_migrations = [

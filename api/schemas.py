@@ -315,6 +315,8 @@ class TemplateExerciseCreate(BaseModel):
     set_rest_override: Optional[int] = None
     exercise_rest_override: Optional[int] = None
     sets: List[TemplateSetCreate]
+    is_unilateral: bool = False
+    attachment: Optional[str] = None
 
 
 class TemplateExerciseResponse(BaseModel):
@@ -324,6 +326,8 @@ class TemplateExerciseResponse(BaseModel):
     set_rest_override: Optional[int]
     exercise_rest_override: Optional[int]
     sets: List[TemplateSetResponse]
+    is_unilateral: bool
+    attachment: Optional[str]
 
     class Config:
         from_attributes = True

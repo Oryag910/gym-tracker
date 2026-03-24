@@ -12,6 +12,8 @@ export interface TemplateExerciseData {
   set_rest_override: number | null
   exercise_rest_override: number | null
   sets: TemplateSetData[]
+  is_unilateral?: boolean
+  attachment?: string | null
 }
 
 export interface TemplateCreate {
@@ -36,6 +38,8 @@ export interface TemplateExerciseResponse {
   set_rest_override: number | null
   exercise_rest_override: number | null
   sets: TemplateSetResponse[]
+  is_unilateral: boolean
+  attachment: string | null
 }
 
 export interface TemplateSummary {

@@ -13,18 +13,22 @@ const today = () => new Date().toISOString().split('T')[0]
 interface CompletedSet {
   exerciseIndex: number
   exerciseName: string
+  isUnilateral: boolean
+  attachment: string | null
   setNumber: number
   targetWeight: number | null
   targetReps: number | null
-  actualWeight: number | null  // lbs (canonical)
+  actualWeight: number | null  // lbs (canonical) — left side for unilateral
   actualReps: number | null
   actualRpe: number | null
+  actualWeightRight: number | null  // right side for unilateral
+  actualRepsRight: number | null
 }
 
 type Phase =
   | { kind: 'loading' }
   | { kind: 'ready'; template: TemplateDetail }
-  | { kind: 'active'; template: TemplateDetail; exerciseIndex: number; setIndex: number; completedSets: CompletedSet[]; actualWeight: string; actualReps: string; actualRpe: string }
+  | { kind: 'active'; template: TemplateDetail; exerciseIndex: number; setIndex: number; completedSets: CompletedSet[]; actualWeight: string; actualReps: string; actualRpe: string; actualWeightRight: string; actualRepsRight: string }
   | { kind: 'resting'; template: TemplateDetail; exerciseIndex: number; setIndex: number; completedSets: CompletedSet[]; totalSeconds: number; restType: 'set' | 'exercise'; nextExerciseIndex: number; nextSetIndex: number }
   | { kind: 'summary'; template: TemplateDetail; completedSets: CompletedSet[]; workoutName: string; date: string }
   | { kind: 'saving' }
@@ -164,7 +168,7 @@ export default function GuidedWorkoutPage() {
       actualWeight: firstEx.sets[0]?.target_weight != null
         ? String(toDisplayWeight(firstEx.sets[0].target_weight, units.weight)) : '',
       actualReps: firstEx.sets[0]?.target_reps != null ? String(firstEx.sets[0].target_reps) : '',
-      actualRpe: '',
+      actualRpe: '', actualWeightRight: '', actualRepsRight: '',
     })
   }
 
@@ -175,7 +179,7 @@ export default function GuidedWorkoutPage() {
       kind: 'active', template, exerciseIndex: exIdx, setIndex: setIdx, completedSets,
       actualWeight: s?.target_weight != null ? String(toDisplayWeight(s.target_weight, units.weight)) : '',
       actualReps: s?.target_reps != null ? String(s.target_reps) : '',
-      actualRpe: '',
+      actualRpe: '', actualWeightRight: '', actualRepsRight: '',
     })
   }
 
@@ -185,11 +189,16 @@ export default function GuidedWorkoutPage() {
     const s = ex.sets[setIndex]
 
     const newSet: CompletedSet = {
-      exerciseIndex, exerciseName: ex.name, setNumber: setIndex + 1,
+      exerciseIndex, exerciseName: ex.name,
+      isUnilateral: ex.is_unilateral, attachment: ex.attachment,
+      setNumber: setIndex + 1,
       targetWeight: s.target_weight, targetReps: s.target_reps,
       actualWeight: actualWeight ? fromInputWeight(parseFloat(actualWeight), units.weight) : null,
       actualReps: actualReps ? parseInt(actualReps) : null,
       actualRpe: actualRpe ? parseInt(actualRpe) : null,
+      actualWeightRight: ex.is_unilateral && p.actualWeightRight
+        ? fromInputWeight(parseFloat(p.actualWeightRight), units.weight) : null,
+      actualRepsRight: ex.is_unilateral && p.actualRepsRight ? parseInt(p.actualRepsRight) : null,
     }
     const newCompleted = [...completedSets, newSet]
 
@@ -240,10 +249,14 @@ export default function GuidedWorkoutPage() {
 
       const exercises = Array.from(exMap.entries()).map(([, sets]) => ({
         name: sets[0].exerciseName,
+        is_unilateral: sets[0].isUnilateral,
+        attachment: sets[0].attachment,
         sets: sets.map(cs => ({
           weight: cs.actualWeight,
           reps: cs.actualReps,
           rpe: cs.actualRpe,
+          weight_right: cs.actualWeightRight,
+          reps_right: cs.actualRepsRight,
         })),
       }))
 
@@ -289,6 +302,8 @@ export default function GuidedWorkoutPage() {
                   <div>
                     <span className="text-slate-300 text-sm font-medium">{ex.name}</span>
                     <span className="text-slate-500 text-xs ml-2">{ex.sets.length} set{ex.sets.length !== 1 ? 's' : ''}</span>
+                    {ex.attachment && <span className="text-slate-500 text-xs ml-2">· {ex.attachment}</span>}
+                    {ex.is_unilateral && <span className="text-blue-400 text-xs ml-2">Unilateral</span>}
                   </div>
                   <div className="text-xs text-slate-500">
                     Rest: {ex.set_rest_override ?? template.default_set_rest}s
@@ -338,6 +353,7 @@ export default function GuidedWorkoutPage() {
               Set {setIndex + 1} of {ex.sets.length}
             </div>
             <h2 className="text-2xl font-black text-slate-100 mb-1 capitalize">{ex.name}</h2>
+            {ex.attachment && <div className="text-slate-500 text-xs mb-1">{ex.attachment}</div>}
             {(s.target_weight != null || s.target_reps != null) && (
               <div className="text-slate-400 text-sm mb-4">
                 Target: {s.target_weight != null ? `${toDisplayWeight(s.target_weight, units.weight)} ${wt}` : 'BW'}
@@ -345,29 +361,76 @@ export default function GuidedWorkoutPage() {
               </div>
             )}
 
-            <div className="grid grid-cols-2 gap-3 mb-3">
-              <div>
-                <label className="block text-xs text-slate-500 mb-1.5 uppercase tracking-wide">Weight ({wt})</label>
-                <input
-                  className={`${input} text-lg font-bold`}
-                  type="number" step="0.5" min="0"
-                  value={actualWeight}
-                  onChange={e => setPhase({ ...phase, actualWeight: e.target.value })}
-                  placeholder="BW"
-                  autoFocus
-                />
+            {ex.is_unilateral ? (
+              /* Unilateral: L and R rows */
+              <div className="space-y-3 mb-3">
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs text-slate-500 mb-1.5 uppercase tracking-wide">
+                      <span className="text-blue-400">L</span> Weight ({wt})
+                    </label>
+                    <input className={`${input} text-lg font-bold`} type="number" step="0.5" min="0"
+                      value={actualWeight}
+                      onChange={e => setPhase({ ...phase, actualWeight: e.target.value })}
+                      placeholder="BW" autoFocus />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-slate-500 mb-1.5 uppercase tracking-wide">
+                      <span className="text-blue-400">L</span> Reps
+                    </label>
+                    <input className={`${input} text-lg font-bold`} type="number" min="0"
+                      value={actualReps}
+                      onChange={e => setPhase({ ...phase, actualReps: e.target.value })}
+                      placeholder="reps" />
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs text-slate-500 mb-1.5 uppercase tracking-wide">
+                      <span className="text-amber-400">R</span> Weight ({wt})
+                    </label>
+                    <input className={`${input} text-lg font-bold`} type="number" step="0.5" min="0"
+                      value={phase.actualWeightRight}
+                      onChange={e => setPhase({ ...phase, actualWeightRight: e.target.value })}
+                      placeholder="BW" />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-slate-500 mb-1.5 uppercase tracking-wide">
+                      <span className="text-amber-400">R</span> Reps
+                    </label>
+                    <input className={`${input} text-lg font-bold`} type="number" min="0"
+                      value={phase.actualRepsRight}
+                      onChange={e => setPhase({ ...phase, actualRepsRight: e.target.value })}
+                      placeholder="reps" />
+                  </div>
+                </div>
               </div>
-              <div>
-                <label className="block text-xs text-slate-500 mb-1.5 uppercase tracking-wide">Reps</label>
-                <input
-                  className={`${input} text-lg font-bold`}
-                  type="number" min="0"
-                  value={actualReps}
-                  onChange={e => setPhase({ ...phase, actualReps: e.target.value })}
-                  placeholder="reps"
-                />
+            ) : (
+              /* Standard bilateral */
+              <div className="grid grid-cols-2 gap-3 mb-3">
+                <div>
+                  <label className="block text-xs text-slate-500 mb-1.5 uppercase tracking-wide">Weight ({wt})</label>
+                  <input
+                    className={`${input} text-lg font-bold`}
+                    type="number" step="0.5" min="0"
+                    value={actualWeight}
+                    onChange={e => setPhase({ ...phase, actualWeight: e.target.value })}
+                    placeholder="BW"
+                    autoFocus
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs text-slate-500 mb-1.5 uppercase tracking-wide">Reps</label>
+                  <input
+                    className={`${input} text-lg font-bold`}
+                    type="number" min="0"
+                    value={actualReps}
+                    onChange={e => setPhase({ ...phase, actualReps: e.target.value })}
+                    placeholder="reps"
+                  />
+                </div>
               </div>
-            </div>
+            )}
             <div className="mb-4">
               <label className="block text-xs text-slate-500 mb-1.5 uppercase tracking-wide">RPE <span className="normal-case text-slate-600">(1–10, optional)</span></label>
               <input

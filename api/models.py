@@ -220,6 +220,8 @@ class TemplateExercise(Base):
     order_index = Column(Integer, nullable=False, default=0)
     set_rest_override = Column(Integer, nullable=True)       # seconds; overrides template default if set
     exercise_rest_override = Column(Integer, nullable=True)  # seconds; overrides template default if set
+    is_unilateral = Column(Boolean, default=False, nullable=False, server_default='0')
+    attachment = Column(String, nullable=True)
 
     template = relationship("WorkoutTemplate", back_populates="exercises")
     sets = relationship(

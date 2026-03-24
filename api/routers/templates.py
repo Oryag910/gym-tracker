@@ -30,6 +30,8 @@ def _build_exercises(db: Session, template_id: int, exercises_data):
             order_index=idx,
             set_rest_override=ex_data.set_rest_override,
             exercise_rest_override=ex_data.exercise_rest_override,
+            is_unilateral=ex_data.is_unilateral,
+            attachment=ex_data.attachment,
         )
         db.add(exercise)
         db.flush()

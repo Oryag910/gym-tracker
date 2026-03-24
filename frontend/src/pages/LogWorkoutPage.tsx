@@ -2,6 +2,8 @@ import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { createWorkout } from '../api/workouts'
+import { listTemplates } from '../api/templates'
+import type { TemplateSummary } from '../api/templates'
 import { listExercises, type GlobalExercise } from '../api/globalExercises'
 import type { ExerciseLookup } from '../api/exercises'
 import MuscleMap from '../components/MuscleMap/MuscleMap'
@@ -90,6 +92,9 @@ export default function LogWorkoutPage() {
   const navigate = useNavigate()
   const { units } = useAuth()
   const wt = weightUnit(units.weight)
+  const [mode, setMode] = useState<'choose' | 'free'>('choose')
+  const [templates, setTemplates] = useState<TemplateSummary[]>([])
+  const [loadingTemplates, setLoadingTemplates] = useState(true)
   const [name, setName] = useState('')
   const [date, setDate] = useState(today())
   const [exercises, setExercises] = useState<ExerciseForm[]>([emptyExercise()])
@@ -101,6 +106,7 @@ export default function LogWorkoutPage() {
 
   useEffect(() => {
     listExercises().then(r => setLibrary(r.data)).catch(() => {})
+    listTemplates().then(r => { setTemplates(r.data); setLoadingTemplates(false) }).catch(() => setLoadingTemplates(false))
   }, [])
 
   const updateExercise = (i: number, patch: Partial<ExerciseForm>) =>
@@ -166,10 +172,84 @@ export default function LogWorkoutPage() {
     }
   }
 
+  // ── Template picker screen ─────────────────────────────────────────────────
+  if (mode === 'choose') {
+    return (
+      <PageTransition>
+        <div className="space-y-6 max-w-2xl mx-auto">
+          <h1 className="text-2xl font-black text-slate-100 tracking-tight">Log Workout</h1>
+
+          {/* Template list */}
+          {loadingTemplates ? (
+            <div className="space-y-3">
+              {[1, 2, 3].map(i => (
+                <div key={i} className={`${card} h-16 animate-pulse bg-slate-800/50`} />
+              ))}
+            </div>
+          ) : templates.length > 0 ? (
+            <div className="space-y-3">
+              <p className="text-xs font-medium text-slate-400 uppercase tracking-wide">Start from a template</p>
+              {templates.map(t => (
+                <button
+                  key={t.id}
+                  type="button"
+                  onClick={() => navigate(`/workout/guided/${t.id}`)}
+                  className={`${card} w-full text-left flex items-center justify-between group hover:border-blue-500/40 transition-colors`}
+                >
+                  <div>
+                    <div className="font-semibold text-slate-100 group-hover:text-blue-300 transition-colors">{t.name}</div>
+                    {t.description && <div className="text-xs text-slate-500 mt-0.5">{t.description}</div>}
+                    <div className="text-xs text-slate-600 mt-1">{t.exercise_count} exercise{t.exercise_count !== 1 ? 's' : ''}</div>
+                  </div>
+                  <svg className="w-5 h-5 text-slate-600 group-hover:text-blue-400 transition-colors shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                  </svg>
+                </button>
+              ))}
+            </div>
+          ) : (
+            <div className={`${card} text-center py-6`}>
+              <p className="text-slate-500 text-sm">No templates yet.</p>
+              <button type="button" onClick={() => navigate('/templates/new')} className="text-blue-400 hover:text-blue-300 text-sm mt-1 transition-colors">
+                Create a template →
+              </button>
+            </div>
+          )}
+
+          {/* Free log option */}
+          <div className="relative">
+            <div className="absolute inset-0 flex items-center">
+              <div className="w-full border-t border-slate-700" />
+            </div>
+            <div className="relative flex justify-center text-xs">
+              <span className="bg-slate-950 px-3 text-slate-500">or</span>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => setMode('free')}
+            className="w-full py-3.5 rounded-2xl border border-slate-600 text-slate-300 font-semibold hover:border-slate-500 hover:text-slate-100 transition-colors"
+          >
+            Log freely (no template)
+          </button>
+        </div>
+      </PageTransition>
+    )
+  }
+
+  // ── Free log form ───────────────────────────────────────────────────────────
   return (
     <PageTransition>
       <div className="space-y-6 max-w-2xl mx-auto">
-        <h1 className="text-2xl font-black text-slate-100 tracking-tight">Log Workout</h1>
+        <div className="flex items-center gap-3">
+          <button type="button" onClick={() => setMode('choose')} className="text-slate-500 hover:text-slate-300 transition-colors">
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+            </svg>
+          </button>
+          <h1 className="text-2xl font-black text-slate-100 tracking-tight">Log Workout</h1>
+        </div>
 
         <form onSubmit={handleSubmit} className="space-y-5">
           {/* Name + Date */}

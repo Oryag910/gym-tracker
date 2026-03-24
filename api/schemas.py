@@ -375,6 +375,10 @@ class TemplateResponse(BaseModel):
 
 # --- Custom Exercise Library ---
 
+class SuggestMusclesRequest(BaseModel):
+    name: str
+
+
 class CustomExerciseCreate(BaseModel):
     name: str
     category: Optional[str] = None

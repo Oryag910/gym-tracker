@@ -7,6 +7,7 @@ import {
   deleteExercise,
   searchExerciseDB,
   importFromWger,
+  suggestMuscles,
   type GlobalExercise,
   type GlobalExercisePayload,
   type ExerciseDBResult,
@@ -128,6 +129,24 @@ function AdminForm({ initial, onSave, onCancel, saving }: {
   const [suggestions, setSuggestions] = useState<ExerciseDBResult[]>([])
   const [showSuggestions, setShowSuggestions] = useState(false)
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const [suggesting, setSuggesting] = useState(false)
+  const [suggestError, setSuggestError] = useState('')
+
+  const handleSuggest = async () => {
+    setSuggesting(true)
+    setSuggestError('')
+    try {
+      const res = await suggestMuscles(form.name.trim())
+      const newMuscles: Record<number, MuscleState> = {}
+      res.data.muscles_primary_ids.forEach(id => { newMuscles[id] = 'primary' })
+      res.data.muscles_secondary_ids.forEach(id => { newMuscles[id] = 'secondary' })
+      setForm(prev => ({ ...prev, muscles: { ...prev.muscles, ...newMuscles } }))
+    } catch {
+      setSuggestError('Could not suggest muscles. Check AI key or try again.')
+    } finally {
+      setSuggesting(false)
+    }
+  }
   const primaryIds = Object.entries(form.muscles).filter(([, s]) => s === 'primary').map(([id]) => Number(id))
   const secondaryIds = Object.entries(form.muscles).filter(([, s]) => s === 'secondary').map(([id]) => Number(id))
 
@@ -154,7 +173,18 @@ function AdminForm({ initial, onSave, onCancel, saving }: {
     <div className={`${card} space-y-5`}>
       <div className="relative">
         <label className="block text-xs font-medium text-slate-400 uppercase tracking-wide mb-1.5">Exercise Name</label>
-        <input className={input} value={form.name} onChange={e => handleNameChange(e.target.value)} placeholder="e.g. Barbell Bench Press" autoFocus onBlur={() => setTimeout(() => setShowSuggestions(false), 150)} onFocus={() => suggestions.length > 0 && setShowSuggestions(true)} />
+        <div className="flex gap-2">
+          <input className={`${input} flex-1`} value={form.name} onChange={e => handleNameChange(e.target.value)} placeholder="e.g. Barbell Bench Press" autoFocus onBlur={() => setTimeout(() => setShowSuggestions(false), 150)} onFocus={() => suggestions.length > 0 && setShowSuggestions(true)} />
+          <button
+            type="button"
+            disabled={!form.name.trim() || suggesting}
+            onClick={handleSuggest}
+            className="shrink-0 px-3 py-2 rounded-xl border border-blue-500/40 text-blue-400 text-sm hover:bg-blue-500/10 disabled:opacity-40 disabled:cursor-not-allowed transition-colors whitespace-nowrap"
+          >
+            {suggesting ? '...' : '✨ Suggest'}
+          </button>
+        </div>
+        {suggestError && <p className="text-red-400 text-xs mt-1">{suggestError}</p>}
         {showSuggestions && (
           <div className="absolute z-20 top-full mt-1 left-0 right-0 bg-slate-800 border border-slate-700 rounded-xl shadow-xl overflow-hidden">
             {suggestions.map((s, i) => (

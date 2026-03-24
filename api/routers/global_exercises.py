@@ -1,6 +1,8 @@
 import json
+import json as json_lib
 import os
 
+import anthropic
 import httpx
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
@@ -8,7 +10,7 @@ from sqlalchemy.orm import Session
 from api.database import get_db
 from api.auth import get_current_user
 from api.models import GlobalExercise, User
-from api.schemas import CustomExerciseCreate, CustomExerciseUpdate, CustomExerciseResponse
+from api.schemas import CustomExerciseCreate, CustomExerciseUpdate, CustomExerciseResponse, SuggestMusclesRequest
 from api.services.exercise_service import MUSCLE_MAP
 
 router = APIRouter(prefix="/library", tags=["library"])
@@ -221,6 +223,50 @@ async def import_from_wger(
 
     db.commit()
     return {"imported": imported, "skipped": skipped, "total_in_batch": len(base_to_image)}
+
+
+@router.post("/suggest-muscles")
+async def suggest_muscles(
+    body: SuggestMusclesRequest,
+    admin: User = Depends(_require_admin),
+):
+    """Call Claude Haiku to suggest primary/secondary muscle IDs for an exercise. Admin only."""
+    api_key = os.environ.get("ANTHROPIC_API_KEY")
+    if not api_key:
+        raise HTTPException(status_code=503, detail="ANTHROPIC_API_KEY not configured")
+
+    muscle_list = "\n".join(f"{k}: {v}" for k, v in MUSCLE_MAP.items())
+    client = anthropic.Anthropic(api_key=api_key)
+
+    msg = client.messages.create(
+        model="claude-haiku-4-5-20251001",
+        max_tokens=256,
+        messages=[{
+            "role": "user",
+            "content": (
+                f'You are a fitness anatomy expert. For the exercise "{body.name}", '
+                f"identify which muscles are primarily and secondarily engaged.\n\n"
+                f"Available muscle IDs:\n{muscle_list}\n\n"
+                f'Respond with ONLY valid JSON: {{"primary": [list of integer IDs], "secondary": [list of integer IDs]}}\n\n'
+                f"Rules:\n"
+                f"- Primary: main movers (directly activated muscles)\n"
+                f"- Secondary: stabilisers and synergists\n"
+                f"- No muscle can appear in both lists\n"
+                f"- Only use IDs from the list above"
+            ),
+        }],
+    )
+
+    try:
+        result = json_lib.loads(msg.content[0].text.strip())
+    except Exception:
+        raise HTTPException(status_code=500, detail="Failed to parse AI response")
+
+    valid = set(MUSCLE_MAP.keys())
+    primary = [i for i in result.get("primary", []) if i in valid]
+    secondary = [i for i in result.get("secondary", []) if i in valid and i not in primary]
+
+    return {"muscles_primary_ids": primary, "muscles_secondary_ids": secondary}
 
 
 @router.get("/exercisedb-search")

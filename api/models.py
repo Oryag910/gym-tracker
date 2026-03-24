@@ -47,6 +47,8 @@ class Exercise(Base):
     workout_id = Column(Integer, ForeignKey("workouts.id", ondelete="CASCADE"), nullable=False, index=True)
     name = Column(String, nullable=False)
     order_index = Column(Integer, nullable=False, default=0)
+    is_unilateral = Column(Boolean, default=False, nullable=False, server_default='0')
+    attachment = Column(String, nullable=True)
 
     workout = relationship("Workout", back_populates="exercises")
     sets = relationship("Set", back_populates="exercise", cascade="all, delete-orphan", order_by="Set.set_number")
@@ -61,6 +63,8 @@ class Set(Base):
     reps = Column(Integer, nullable=True)
     rpe = Column(Integer, nullable=True)   # 1–10
     set_number = Column(Integer, nullable=False)
+    weight_right = Column(Float, nullable=True)   # right side weight for unilateral exercises
+    reps_right = Column(Integer, nullable=True)   # right side reps for unilateral exercises
 
     exercise = relationship("Exercise", back_populates="sets")
 

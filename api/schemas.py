@@ -65,6 +65,8 @@ class SetCreate(BaseModel):
     weight: Optional[float] = None
     reps: Optional[int] = None
     rpe: Optional[int] = None
+    weight_right: Optional[float] = None   # right side weight for unilateral exercises
+    reps_right: Optional[int] = None       # right side reps for unilateral exercises
 
 
 class SetResponse(BaseModel):
@@ -73,6 +75,8 @@ class SetResponse(BaseModel):
     weight: Optional[float]
     reps: Optional[int]
     rpe: Optional[int]
+    weight_right: Optional[float]
+    reps_right: Optional[int]
 
     class Config:
         from_attributes = True
@@ -82,6 +86,8 @@ class SetUpdate(BaseModel):
     weight: Optional[float] = None
     reps: Optional[int] = None
     rpe: Optional[int] = None
+    weight_right: Optional[float] = None
+    reps_right: Optional[int] = None
 
 
 # --- Exercises ---
@@ -89,6 +95,8 @@ class SetUpdate(BaseModel):
 class ExerciseCreate(BaseModel):
     name: str
     sets: list[SetCreate]
+    is_unilateral: bool = False
+    attachment: Optional[str] = None
 
 
 class ExerciseResponse(BaseModel):
@@ -96,6 +104,8 @@ class ExerciseResponse(BaseModel):
     name: str
     order_index: int
     sets: list[SetResponse]
+    is_unilateral: bool
+    attachment: Optional[str]
 
     class Config:
         from_attributes = True

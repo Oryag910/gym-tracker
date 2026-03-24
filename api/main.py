@@ -31,6 +31,10 @@ _migrations = [
     ("users", "pref_measure",     "VARCHAR"),
     ("users", "pref_temp",        "VARCHAR"),
     ("sets",  "rpe",              "INTEGER"),
+    ("exercises", "is_unilateral", "BOOLEAN DEFAULT FALSE"),
+    ("exercises", "attachment",    "VARCHAR"),
+    ("sets",      "weight_right",  "REAL"),
+    ("sets",      "reps_right",    "INTEGER"),
 ]
 # Create indexes for performance (safe to run multiple times)
 _index_migrations = [

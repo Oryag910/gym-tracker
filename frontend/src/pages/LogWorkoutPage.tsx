@@ -53,7 +53,7 @@ function LogTechniquePanel({ description, category }: { description: string; cat
   )
 }
 
-interface SetForm { weight: string; reps: string; rpe: string }
+interface SetForm { weight: string; reps: string; rpe: string; weight_right: string; reps_right: string }
 interface ExerciseForm {
   name: string
   sets: SetForm[]
@@ -61,12 +61,16 @@ interface ExerciseForm {
   showMuscles: boolean
   filter: string
   showPicker: boolean
+  is_unilateral: boolean
+  attachment: string
 }
 
 const today = () => new Date().toISOString().split('T')[0]
+const emptySet = (): SetForm => ({ weight: '', reps: '', rpe: '', weight_right: '', reps_right: '' })
 const emptyExercise = (): ExerciseForm => ({
-  name: '', sets: [{ weight: '', reps: '', rpe: '' }],
+  name: '', sets: [emptySet()],
   lookup: null, showMuscles: false, filter: '', showPicker: false,
+  is_unilateral: false, attachment: '',
 })
 
 function libraryToLookup(ex: GlobalExercise): ExerciseLookup {
@@ -122,13 +126,13 @@ export default function LogWorkoutPage() {
 
   const addSet = (i: number) =>
     setExercises(prev => prev.map((ex, idx) =>
-      idx === i ? { ...ex, sets: [...ex.sets, { weight: '', reps: '', rpe: '' }] } : ex))
+      idx === i ? { ...ex, sets: [...ex.sets, emptySet()] } : ex))
 
   const removeSet = (ei: number, si: number) =>
     setExercises(prev => prev.map((ex, idx) =>
       idx === ei ? { ...ex, sets: ex.sets.filter((_, s) => s !== si) } : ex))
 
-  const updateSet = (ei: number, si: number, field: 'weight' | 'reps' | 'rpe', val: string) =>
+  const updateSet = (ei: number, si: number, field: keyof SetForm, val: string) =>
     setExercises(prev => prev.map((ex, idx) =>
       idx === ei ? { ...ex, sets: ex.sets.map((s, sidx) => sidx === si ? { ...s, [field]: val } : s) } : ex))
 
@@ -141,10 +145,15 @@ export default function LogWorkoutPage() {
         name, date,
         exercises: exercises.map(ex => ({
           name: ex.name,
+          is_unilateral: ex.is_unilateral,
+          attachment: ex.attachment || null,
           sets: ex.sets.map(s => ({
             weight: s.weight ? fromInputWeight(parseFloat(s.weight), units.weight) : null,
             reps: s.reps ? parseInt(s.reps) : null,
             rpe: s.rpe ? parseInt(s.rpe) : null,
+            weight_right: ex.is_unilateral && s.weight_right
+              ? fromInputWeight(parseFloat(s.weight_right), units.weight) : null,
+            reps_right: ex.is_unilateral && s.reps_right ? parseInt(s.reps_right) : null,
           })),
         })),
       }
@@ -256,6 +265,29 @@ export default function LogWorkoutPage() {
                     )}
                   </div>
 
+                  {/* Attachment + unilateral toggle — shown once an exercise is selected */}
+                  {ex.name && (
+                    <div className="flex items-center gap-3 mb-4">
+                      <input
+                        className={`${input} flex-1 text-sm`}
+                        value={ex.attachment}
+                        onChange={e => updateExercise(ei, { attachment: e.target.value })}
+                        placeholder="Attachment (e.g. D-handle, cuff, rope...)"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => updateExercise(ei, { is_unilateral: !ex.is_unilateral })}
+                        className={`shrink-0 px-3 py-2 rounded-xl text-xs font-medium border transition-colors ${
+                          ex.is_unilateral
+                            ? 'bg-blue-500/20 border-blue-400/60 text-blue-300'
+                            : 'border-slate-600 text-slate-500 hover:border-slate-500'
+                        }`}
+                      >
+                        Unilateral
+                      </button>
+                    </div>
+                  )}
+
                   {/* Muscle map + technique */}
                   <AnimatePresence>
                     {ex.lookup && ex.showMuscles && (
@@ -301,9 +333,16 @@ export default function LogWorkoutPage() {
 
                   {/* Sets */}
                   <div className="space-y-2">
-                    <div className="grid grid-cols-[24px_1fr_1fr_52px_24px] gap-2 text-xs text-slate-500 px-1">
-                      <span>Set</span><span>Weight ({wt})</span><span>Reps</span><span>RPE</span><span />
-                    </div>
+                    {/* Column headers */}
+                    {ex.is_unilateral ? (
+                      <div className="grid grid-cols-[24px_28px_1fr_1fr] gap-2 text-xs text-slate-500 px-1">
+                        <span>Set</span><span>Side</span><span>Weight ({wt})</span><span>Reps</span>
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-[24px_1fr_1fr_52px_24px] gap-2 text-xs text-slate-500 px-1">
+                        <span>Set</span><span>Weight ({wt})</span><span>Reps</span><span>RPE</span><span />
+                      </div>
+                    )}
                     <AnimatePresence>
                       {ex.sets.map((s, si) => (
                         <motion.div
@@ -312,33 +351,89 @@ export default function LogWorkoutPage() {
                           initial={{ opacity: 0 }}
                           animate={{ opacity: 1 }}
                           exit={{ opacity: 0 }}
-                          className="grid grid-cols-[24px_1fr_1fr_52px_24px] gap-2 items-center"
                         >
-                          <span className="text-slate-500 text-sm text-center">{si + 1}</span>
-                          <input
-                            className={input}
-                            type="number" step="0.5" min="0"
-                            value={s.weight}
-                            onChange={e => updateSet(ei, si, 'weight', e.target.value)}
-                            placeholder="BW"
-                          />
-                          <input
-                            className={input}
-                            type="number" min="0"
-                            value={s.reps}
-                            onChange={e => updateSet(ei, si, 'reps', e.target.value)}
-                            placeholder="reps"
-                          />
-                          <input
-                            className={input}
-                            type="number" min="1" max="10"
-                            value={s.rpe}
-                            onChange={e => updateSet(ei, si, 'rpe', e.target.value)}
-                            placeholder="—"
-                          />
-                          {ex.sets.length > 1 ? (
-                            <button type="button" onClick={() => removeSet(ei, si)} className="text-slate-600 hover:text-red-400 transition-colors text-lg leading-none">×</button>
-                          ) : <span />}
+                          {ex.is_unilateral ? (
+                            /* Unilateral: two sub-rows per set (L and R) */
+                            <div className="border-b border-slate-700/50 last:border-0 py-2">
+                              {/* L row */}
+                              <div className="grid grid-cols-[24px_28px_1fr_1fr] gap-2 mb-1.5 items-center">
+                                <span className="text-slate-500 text-sm text-center">{si + 1}</span>
+                                <span className="text-[11px] font-bold text-blue-400">L</span>
+                                <input
+                                  className={input}
+                                  type="number" step="0.5" min="0"
+                                  value={s.weight}
+                                  onChange={e => updateSet(ei, si, 'weight', e.target.value)}
+                                  placeholder="BW"
+                                />
+                                <input
+                                  className={input}
+                                  type="number" min="0"
+                                  value={s.reps}
+                                  onChange={e => updateSet(ei, si, 'reps', e.target.value)}
+                                  placeholder="reps"
+                                />
+                              </div>
+                              {/* R row */}
+                              <div className="grid grid-cols-[24px_28px_1fr_1fr_52px_24px] gap-2 items-center">
+                                <span />
+                                <span className="text-[11px] font-bold text-amber-400">R</span>
+                                <input
+                                  className={input}
+                                  type="number" step="0.5" min="0"
+                                  value={s.weight_right}
+                                  onChange={e => updateSet(ei, si, 'weight_right', e.target.value)}
+                                  placeholder="BW"
+                                />
+                                <input
+                                  className={input}
+                                  type="number" min="0"
+                                  value={s.reps_right}
+                                  onChange={e => updateSet(ei, si, 'reps_right', e.target.value)}
+                                  placeholder="reps"
+                                />
+                                <input
+                                  className={input}
+                                  type="number" min="1" max="10"
+                                  value={s.rpe}
+                                  onChange={e => updateSet(ei, si, 'rpe', e.target.value)}
+                                  placeholder="RPE"
+                                />
+                                {ex.sets.length > 1 ? (
+                                  <button type="button" onClick={() => removeSet(ei, si)} className="text-slate-600 hover:text-red-400 transition-colors text-lg leading-none">×</button>
+                                ) : <span />}
+                              </div>
+                            </div>
+                          ) : (
+                            /* Standard bilateral row */
+                            <div className="grid grid-cols-[24px_1fr_1fr_52px_24px] gap-2 items-center">
+                              <span className="text-slate-500 text-sm text-center">{si + 1}</span>
+                              <input
+                                className={input}
+                                type="number" step="0.5" min="0"
+                                value={s.weight}
+                                onChange={e => updateSet(ei, si, 'weight', e.target.value)}
+                                placeholder="BW"
+                              />
+                              <input
+                                className={input}
+                                type="number" min="0"
+                                value={s.reps}
+                                onChange={e => updateSet(ei, si, 'reps', e.target.value)}
+                                placeholder="reps"
+                              />
+                              <input
+                                className={input}
+                                type="number" min="1" max="10"
+                                value={s.rpe}
+                                onChange={e => updateSet(ei, si, 'rpe', e.target.value)}
+                                placeholder="—"
+                              />
+                              {ex.sets.length > 1 ? (
+                                <button type="button" onClick={() => removeSet(ei, si)} className="text-slate-600 hover:text-red-400 transition-colors text-lg leading-none">×</button>
+                              ) : <span />}
+                            </div>
+                          )}
                         </motion.div>
                       ))}
                     </AnimatePresence>

@@ -11,8 +11,8 @@ import PageTransition from '../components/PageTransition'
 import { useAuth } from '../context/AuthContext'
 import { toDisplayWeight, fromInputWeight, weightUnit } from '../utils/units'
 
-function SetRow({ set, workoutId, exerciseId, onUpdated, unitSystem }: {
-  set: SetResponse; workoutId: number; exerciseId: number; onUpdated: () => void; unitSystem: string
+function SetRow({ set, workoutId, exerciseId, onUpdated, unitSystem, isUnilateral }: {
+  set: SetResponse; workoutId: number; exerciseId: number; onUpdated: () => void; unitSystem: string; isUnilateral: boolean
 }) {
   const [editing, setEditing] = useState(false)
   const [weight, setWeight] = useState(
@@ -20,6 +20,10 @@ function SetRow({ set, workoutId, exerciseId, onUpdated, unitSystem }: {
   )
   const [reps, setReps] = useState(set.reps?.toString() ?? '')
   const [rpe, setRpe] = useState(set.rpe?.toString() ?? '')
+  const [weightRight, setWeightRight] = useState(
+    set.weight_right != null ? toDisplayWeight(set.weight_right, unitSystem as any).toString() : ''
+  )
+  const [repsRight, setRepsRight] = useState(set.reps_right?.toString() ?? '')
   const [saving, setSaving] = useState(false)
   const wt = weightUnit(unitSystem as any)
 
@@ -29,10 +33,72 @@ function SetRow({ set, workoutId, exerciseId, onUpdated, unitSystem }: {
       weight: weight ? fromInputWeight(parseFloat(weight), unitSystem as any) : undefined,
       reps: reps ? parseInt(reps) : undefined,
       rpe: rpe ? parseInt(rpe) : undefined,
+      weight_right: isUnilateral && weightRight ? fromInputWeight(parseFloat(weightRight), unitSystem as any) : undefined,
+      reps_right: isUnilateral && repsRight ? parseInt(repsRight) : undefined,
     })
     setSaving(false)
     setEditing(false)
     onUpdated()
+  }
+
+  if (isUnilateral) {
+    return (
+      <motion.div layout className="py-2.5 border-b border-slate-700/50 last:border-0">
+        {editing ? (
+          <>
+            {/* L row */}
+            <div className="grid grid-cols-[32px_28px_1fr_1fr] gap-2 mb-2 items-center">
+              <span className="text-slate-500 text-sm text-center">{set.set_number}</span>
+              <span className="text-[11px] font-bold text-blue-400">L</span>
+              <input value={weight} onChange={e => setWeight(e.target.value)}
+                className="bg-slate-900 border border-slate-600 rounded-lg px-2 py-1.5 text-sm text-slate-100 focus:border-blue-400 focus:outline-none w-full"
+                placeholder={wt} autoFocus />
+              <input value={reps} onChange={e => setReps(e.target.value)}
+                className="bg-slate-900 border border-slate-600 rounded-lg px-2 py-1.5 text-sm text-slate-100 focus:border-blue-400 focus:outline-none w-full"
+                placeholder="reps" />
+            </div>
+            {/* R row */}
+            <div className="grid grid-cols-[32px_28px_1fr_1fr_52px_auto_auto] gap-2 items-center">
+              <span />
+              <span className="text-[11px] font-bold text-amber-400">R</span>
+              <input value={weightRight} onChange={e => setWeightRight(e.target.value)}
+                className="bg-slate-900 border border-slate-600 rounded-lg px-2 py-1.5 text-sm text-slate-100 focus:border-blue-400 focus:outline-none w-full"
+                placeholder={wt} />
+              <input value={repsRight} onChange={e => setRepsRight(e.target.value)}
+                className="bg-slate-900 border border-slate-600 rounded-lg px-2 py-1.5 text-sm text-slate-100 focus:border-blue-400 focus:outline-none w-full"
+                placeholder="reps" />
+              <input value={rpe} onChange={e => setRpe(e.target.value)}
+                type="number" min="1" max="10"
+                className="bg-slate-900 border border-slate-600 rounded-lg px-2 py-1.5 text-sm text-slate-100 focus:border-blue-400 focus:outline-none w-full"
+                placeholder="RPE" />
+              <button onClick={save} disabled={saving} className={btnPrimary + ' py-1.5 px-3 text-sm'}>
+                {saving ? '...' : 'Save'}
+              </button>
+              <button onClick={() => setEditing(false)} className="text-slate-500 hover:text-slate-300 text-sm px-2">
+                Cancel
+              </button>
+            </div>
+          </>
+        ) : (
+          <div className="flex items-center gap-3">
+            <span className="text-slate-500 text-sm w-8 text-center shrink-0">{set.set_number}</span>
+            <div className="flex-1 min-w-0">
+              <div className="text-sm text-slate-200">
+                <span className="text-blue-300 text-xs font-bold">L</span>{' '}
+                {set.weight != null ? `${toDisplayWeight(set.weight, unitSystem as any)} ${wt}` : 'BW'} · {set.reps ?? '—'} reps
+                {' / '}
+                <span className="text-amber-300 text-xs font-bold">R</span>{' '}
+                {set.weight_right != null ? `${toDisplayWeight(set.weight_right, unitSystem as any)} ${wt}` : 'BW'} · {set.reps_right ?? '—'} reps
+              </div>
+              {set.rpe != null && <div className="text-slate-500 text-xs mt-0.5">RPE {set.rpe}</div>}
+            </div>
+            <button onClick={() => setEditing(true)} className="text-slate-600 hover:text-blue-400 transition-colors text-xs shrink-0">
+              Edit
+            </button>
+          </div>
+        )}
+      </motion.div>
+    )
   }
 
   return (
@@ -171,7 +237,11 @@ function ExerciseCard({ exercise, workoutId, onUpdated, unitSystem }: {
           )}
           <div>
             <h3 className="font-semibold text-slate-100 capitalize">{exercise.name}</h3>
-            <div className="text-slate-500 text-xs mt-0.5">{exercise.sets.length} sets</div>
+            <div className="text-slate-500 text-xs mt-0.5">
+              {exercise.sets.length} sets
+              {exercise.attachment && <span> · {exercise.attachment}</span>}
+              {exercise.is_unilateral && <span> · Unilateral</span>}
+            </div>
           </div>
         </div>
         <button
@@ -206,16 +276,22 @@ function ExerciseCard({ exercise, workoutId, onUpdated, unitSystem }: {
       </AnimatePresence>
 
       {/* Column headers */}
-      <div className="grid grid-cols-[32px_1fr_1fr_52px_auto] gap-3 text-xs text-slate-500 mb-1 px-0">
-        <span className="text-center">Set</span>
-        <span>Weight ({weightUnit(unitSystem as any)})</span>
-        <span>Reps</span>
-        <span>RPE</span>
-        <span />
-      </div>
+      {exercise.is_unilateral ? (
+        <div className="text-xs text-slate-500 mb-1">
+          Set · L and R weight / reps · RPE
+        </div>
+      ) : (
+        <div className="grid grid-cols-[32px_1fr_1fr_52px_auto] gap-3 text-xs text-slate-500 mb-1 px-0">
+          <span className="text-center">Set</span>
+          <span>Weight ({weightUnit(unitSystem as any)})</span>
+          <span>Reps</span>
+          <span>RPE</span>
+          <span />
+        </div>
+      )}
 
       {exercise.sets.map(s => (
-        <SetRow key={s.id} set={s} workoutId={workoutId} exerciseId={exercise.id} onUpdated={onUpdated} unitSystem={unitSystem} />
+        <SetRow key={s.id} set={s} workoutId={workoutId} exerciseId={exercise.id} onUpdated={onUpdated} unitSystem={unitSystem} isUnilateral={exercise.is_unilateral} />
       ))}
     </div>
   )

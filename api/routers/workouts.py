@@ -45,7 +45,13 @@ def create_workout(body: WorkoutCreate, current_user: User = Depends(get_current
     db.flush()
 
     for idx, ex_data in enumerate(body.exercises):
-        exercise = Exercise(workout_id=workout.id, name=ex_data.name, order_index=idx)
+        exercise = Exercise(
+            workout_id=workout.id,
+            name=ex_data.name,
+            order_index=idx,
+            is_unilateral=ex_data.is_unilateral,
+            attachment=ex_data.attachment,
+        )
         db.add(exercise)
         db.flush()
 
@@ -55,6 +61,8 @@ def create_workout(body: WorkoutCreate, current_user: User = Depends(get_current
                 weight=set_data.weight,
                 reps=set_data.reps,
                 rpe=set_data.rpe,
+                weight_right=set_data.weight_right,
+                reps_right=set_data.reps_right,
                 set_number=set_num,
             )
             db.add(s)
@@ -119,5 +127,13 @@ def update_set(
         set_.reps = body.reps
     if body.rpe is not None:
         set_.rpe = body.rpe
+    if body.weight_right is not None:
+        set_.weight_right = body.weight_right
+    if body.reps_right is not None:
+        set_.reps_right = body.reps_right
     db.commit()
-    return {"id": set_.id, "weight": set_.weight, "reps": set_.reps, "rpe": set_.rpe}
+    return {
+        "id": set_.id,
+        "weight": set_.weight, "reps": set_.reps, "rpe": set_.rpe,
+        "weight_right": set_.weight_right, "reps_right": set_.reps_right,
+    }

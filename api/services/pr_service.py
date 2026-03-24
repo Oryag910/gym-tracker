@@ -1,5 +1,5 @@
 from typing import Optional
-from sqlalchemy import func
+from sqlalchemy import func, and_
 from sqlalchemy.orm import Session, joinedload
 
 from api.models import Workout, Exercise, Set
@@ -8,44 +8,48 @@ from api.models import Workout, Exercise, Set
 def get_prs(user_id: int, db: Session) -> list[dict]:
     """Return all-time PR (max weight) per exercise for a user, with the date it was achieved.
 
-    Uses a SQL GROUP BY aggregate instead of loading all rows into Python —
-    reduces ~1,200 lazy queries down to ~N+1 (N = unique exercise names, ~30).
+    Single query using a subquery join — fixes the PostgreSQL GROUP BY error
+    (Exercise.name was selected without being in GROUP BY, which SQLite tolerates
+    but PostgreSQL rejects) and reduces ~31 queries down to 1.
     """
-    # Step 1: one query — max weight per exercise name (case-insensitive)
-    pr_rows = (
+    # Subquery: max weight per exercise name (case-insensitive)
+    max_sq = (
         db.query(
             func.lower(Exercise.name).label("name_key"),
-            Exercise.name,
-            func.max(Set.weight).label("weight"),
+            func.max(Set.weight).label("max_w"),
         )
         .join(Set, Set.exercise_id == Exercise.id)
         .join(Workout, Exercise.workout_id == Workout.id)
         .filter(Workout.user_id == user_id)
         .filter(Set.weight.isnot(None))
         .group_by(func.lower(Exercise.name))
+        .subquery()
+    )
+
+    # Join back to get earliest date when each PR weight was achieved
+    rows = (
+        db.query(
+            func.lower(Exercise.name).label("name_key"),
+            func.min(Exercise.name).label("name"),  # any capitalisation from the group
+            max_sq.c.max_w.label("weight"),
+            func.min(Workout.date).label("date"),
+        )
+        .join(Set, Set.exercise_id == Exercise.id)
+        .join(Workout, Exercise.workout_id == Workout.id)
+        .join(
+            max_sq,
+            and_(
+                func.lower(Exercise.name) == max_sq.c.name_key,
+                Set.weight == max_sq.c.max_w,
+            ),
+        )
+        .filter(Workout.user_id == user_id)
+        .filter(Set.weight.isnot(None))
+        .group_by(func.lower(Exercise.name), max_sq.c.max_w)
         .all()
     )
 
-    # Step 2: for each PR, find the earliest date that weight was hit
-    result = []
-    for row in pr_rows:
-        date_row = (
-            db.query(Workout.date)
-            .join(Exercise, Exercise.workout_id == Workout.id)
-            .join(Set, Set.exercise_id == Exercise.id)
-            .filter(Workout.user_id == user_id)
-            .filter(func.lower(Exercise.name) == row.name_key)
-            .filter(Set.weight == row.weight)
-            .order_by(Workout.date)
-            .first()
-        )
-        result.append({
-            "exercise": row.name,
-            "weight": row.weight,
-            "date": date_row[0] if date_row else None,
-        })
-
-    return result
+    return [{"exercise": r.name, "weight": r.weight, "date": r.date} for r in rows]
 
 
 def get_pr_history(exercise_name: str, user_id: int, db: Session) -> list[dict]:

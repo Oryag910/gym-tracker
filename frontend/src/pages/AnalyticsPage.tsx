@@ -196,6 +196,8 @@ export default function AnalyticsPage() {
   const [volume, setVolume] = useState<VolumePoint[]>([])
   const [volumeRange, setVolumeRange] = useState(90)
   const [volumeWorkout, setVolumeWorkout] = useState<string>('all')
+  const [volumeWorkoutFilter, setVolumeWorkoutFilter] = useState('')
+  const [volumeWorkoutShowPicker, setVolumeWorkoutShowPicker] = useState(false)
   const [loading, setLoading] = useState(true)
 
   // PR Progress
@@ -293,7 +295,15 @@ export default function AnalyticsPage() {
 
   // Filtered data
   const volumeCutoff = cutoffDate(volumeRange)
-  const volumeWorkoutNames = [...new Set(volume.map(v => v.workout_name))].sort()
+  // Only include workout names logged 5+ times — filters out one-offs and mistakes
+  const volumeWorkoutCounts = volume.reduce((acc, v) => {
+    acc[v.workout_name] = (acc[v.workout_name] || 0) + 1
+    return acc
+  }, {} as Record<string, number>)
+  const volumeWorkoutNames = Object.entries(volumeWorkoutCounts)
+    .filter(([, count]) => count >= 5)
+    .map(([name]) => name)
+    .sort()
   const filteredVolume = volume
     .filter(v => new Date(v.date) >= volumeCutoff)
     .filter(v => volumeWorkout === 'all' || v.workout_name === volumeWorkout)
@@ -376,23 +386,40 @@ export default function AnalyticsPage() {
               <p className="text-slate-500 text-center py-10">No data yet.</p>
             ) : (
               <>
-                {/* Workout type filter — pills built from unique workout names in the data */}
-                <div className="flex flex-wrap gap-2 mb-4">
-                  <button onClick={() => setVolumeWorkout('all')}
-                    className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-colors shrink-0 ${
-                      volumeWorkout === 'all'
-                        ? 'bg-emerald-500/20 border-emerald-500/50 text-emerald-300'
-                        : 'bg-slate-800 border-slate-700 text-slate-400 hover:text-slate-200'
-                    }`}>All</button>
-                  {volumeWorkoutNames.map(name => (
-                    <button key={name} onClick={() => setVolumeWorkout(name)}
-                      className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-colors shrink-0 ${
-                        volumeWorkout === name
-                          ? 'bg-emerald-500/20 border-emerald-500/50 text-emerald-300'
-                          : 'bg-slate-800 border-slate-700 text-slate-400 hover:text-slate-200'
-                      }`}>{name}</button>
-                  ))}
-                </div>
+                {/* Workout type filter — searchable dropdown, only names with 5+ sessions */}
+                {volumeWorkout !== 'all' ? (
+                  <div className="flex items-center gap-2 mb-4">
+                    <div className={`${input} flex-1 text-slate-100 cursor-default`}>{volumeWorkout}</div>
+                    <button onClick={() => setVolumeWorkout('all')}
+                      className="text-xs text-slate-500 hover:text-blue-400 transition-colors shrink-0">
+                      Clear
+                    </button>
+                  </div>
+                ) : (
+                  <div className="relative mb-4">
+                    <input
+                      className={input}
+                      value={volumeWorkoutFilter}
+                      onChange={e => setVolumeWorkoutFilter(e.target.value)}
+                      onFocus={() => setVolumeWorkoutShowPicker(true)}
+                      onBlur={() => setTimeout(() => setVolumeWorkoutShowPicker(false), 150)}
+                      placeholder="Filter by workout type… (showing all)"
+                    />
+                    {volumeWorkoutShowPicker && volumeWorkoutNames.length > 0 && (
+                      <div className="absolute z-20 top-full mt-1 left-0 right-0 bg-slate-800 border border-slate-700 rounded-xl shadow-xl overflow-hidden max-h-52 overflow-y-auto">
+                        {volumeWorkoutNames
+                          .filter(n => volumeWorkoutFilter.trim() === '' || n.toLowerCase().includes(volumeWorkoutFilter.toLowerCase()))
+                          .map(name => (
+                            <button key={name} type="button"
+                              onMouseDown={() => { setVolumeWorkout(name); setVolumeWorkoutFilter(''); setVolumeWorkoutShowPicker(false) }}
+                              className="w-full px-3 py-2.5 hover:bg-slate-700/60 transition-colors text-left text-sm text-slate-200 border-b border-slate-700/50 last:border-0">
+                              {name}
+                            </button>
+                          ))}
+                      </div>
+                    )}
+                  </div>
+                )}
                 <RangeButtons range={volumeRange} setRange={setVolumeRange} />
                 {filteredVolume.length === 0 ? (
                   <div className="text-center py-12">
@@ -515,7 +542,8 @@ export default function AnalyticsPage() {
                     )}
                   </div>
                 )}
-                <RangeButtons range={prRange} setRange={setPrRange} />
+                {/* Time range only makes sense after an exercise is selected */}
+                {prExercise && <RangeButtons range={prRange} setRange={setPrRange} />}
                 {prLoading ? (
                   <div className={`${skeleton} h-56`} />
                 ) : filteredPRHistory.length === 0 ? (

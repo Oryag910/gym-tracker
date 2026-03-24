@@ -50,23 +50,23 @@ function SetRow({ set, workoutId, exerciseId, onUpdated, unitSystem, isUnilatera
             <div className="grid grid-cols-[32px_28px_1fr_1fr] gap-2 mb-2 items-center">
               <span className="text-slate-500 text-sm text-center">{set.set_number}</span>
               <span className="text-[11px] font-bold text-blue-400">L</span>
-              <input value={weight} onChange={e => setWeight(e.target.value)}
-                className="bg-slate-900 border border-slate-600 rounded-lg px-2 py-1.5 text-sm text-slate-100 focus:border-blue-400 focus:outline-none w-full"
-                placeholder={wt} autoFocus />
               <input value={reps} onChange={e => setReps(e.target.value)}
                 className="bg-slate-900 border border-slate-600 rounded-lg px-2 py-1.5 text-sm text-slate-100 focus:border-blue-400 focus:outline-none w-full"
-                placeholder="reps" />
+                placeholder="reps" autoFocus />
+              <input value={weight} onChange={e => setWeight(e.target.value)}
+                className="bg-slate-900 border border-slate-600 rounded-lg px-2 py-1.5 text-sm text-slate-100 focus:border-blue-400 focus:outline-none w-full"
+                placeholder={wt} />
             </div>
             {/* R row */}
             <div className="grid grid-cols-[32px_28px_1fr_1fr_52px_auto_auto] gap-2 items-center">
               <span />
               <span className="text-[11px] font-bold text-amber-400">R</span>
-              <input value={weightRight} onChange={e => setWeightRight(e.target.value)}
-                className="bg-slate-900 border border-slate-600 rounded-lg px-2 py-1.5 text-sm text-slate-100 focus:border-blue-400 focus:outline-none w-full"
-                placeholder={wt} />
               <input value={repsRight} onChange={e => setRepsRight(e.target.value)}
                 className="bg-slate-900 border border-slate-600 rounded-lg px-2 py-1.5 text-sm text-slate-100 focus:border-blue-400 focus:outline-none w-full"
                 placeholder="reps" />
+              <input value={weightRight} onChange={e => setWeightRight(e.target.value)}
+                className="bg-slate-900 border border-slate-600 rounded-lg px-2 py-1.5 text-sm text-slate-100 focus:border-blue-400 focus:outline-none w-full"
+                placeholder={wt} />
               <input value={rpe} onChange={e => setRpe(e.target.value)}
                 type="number" min="1" max="10"
                 className="bg-slate-900 border border-slate-600 rounded-lg px-2 py-1.5 text-sm text-slate-100 focus:border-blue-400 focus:outline-none w-full"
@@ -113,17 +113,17 @@ function SetRow({ set, workoutId, exerciseId, onUpdated, unitSystem, isUnilatera
       {editing ? (
         <>
           <input
-            value={weight}
-            onChange={e => setWeight(e.target.value)}
-            className="bg-slate-900 border border-slate-600 rounded-lg px-2 py-1.5 text-sm text-slate-100 focus:border-blue-400 focus:outline-none w-full"
-            placeholder={wt}
-            autoFocus
-          />
-          <input
             value={reps}
             onChange={e => setReps(e.target.value)}
             className="bg-slate-900 border border-slate-600 rounded-lg px-2 py-1.5 text-sm text-slate-100 focus:border-blue-400 focus:outline-none w-full"
             placeholder="reps"
+            autoFocus
+          />
+          <input
+            value={weight}
+            onChange={e => setWeight(e.target.value)}
+            className="bg-slate-900 border border-slate-600 rounded-lg px-2 py-1.5 text-sm text-slate-100 focus:border-blue-400 focus:outline-none w-full"
+            placeholder={wt}
           />
           <input
             value={rpe}
@@ -141,10 +141,10 @@ function SetRow({ set, workoutId, exerciseId, onUpdated, unitSystem, isUnilatera
         </>
       ) : (
         <>
+          <span className="text-slate-200 text-sm">{set.reps ?? '—'} reps</span>
           <span className="text-slate-200 text-sm">
             {set.weight != null ? `${toDisplayWeight(set.weight, unitSystem as any)} ${wt}` : 'BW'}
           </span>
-          <span className="text-slate-200 text-sm">{set.reps ?? '—'} reps</span>
           <span className="text-slate-500 text-xs">
             {set.rpe != null ? `RPE ${set.rpe}` : '—'}
           </span>
@@ -278,13 +278,13 @@ function ExerciseCard({ exercise, workoutId, onUpdated, unitSystem }: {
       {/* Column headers */}
       {exercise.is_unilateral ? (
         <div className="text-xs text-slate-500 mb-1">
-          Set · L and R weight / reps · RPE
+          Set · L and R reps / weight · RPE
         </div>
       ) : (
         <div className="grid grid-cols-[32px_1fr_1fr_52px_auto] gap-3 text-xs text-slate-500 mb-1 px-0">
           <span className="text-center">Set</span>
-          <span>Weight ({weightUnit(unitSystem as any)})</span>
           <span>Reps</span>
+          <span>Weight ({weightUnit(unitSystem as any)})</span>
           <span>RPE</span>
           <span />
         </div>

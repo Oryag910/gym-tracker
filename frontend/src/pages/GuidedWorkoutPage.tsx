@@ -367,33 +367,24 @@ export default function GuidedWorkoutPage() {
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className="block text-xs text-slate-500 mb-1.5 uppercase tracking-wide">
-                      <span className="text-blue-400">L</span> Weight ({wt})
-                    </label>
-                    <input className={`${input} text-lg font-bold`} type="number" step="0.5" min="0"
-                      value={actualWeight}
-                      onChange={e => setPhase({ ...phase, actualWeight: e.target.value })}
-                      placeholder="BW" autoFocus />
-                  </div>
-                  <div>
-                    <label className="block text-xs text-slate-500 mb-1.5 uppercase tracking-wide">
                       <span className="text-blue-400">L</span> Reps
                     </label>
                     <input className={`${input} text-lg font-bold`} type="number" min="0"
                       value={actualReps}
                       onChange={e => setPhase({ ...phase, actualReps: e.target.value })}
-                      placeholder="reps" />
+                      placeholder="reps" autoFocus />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-slate-500 mb-1.5 uppercase tracking-wide">
+                      <span className="text-blue-400">L</span> Weight ({wt})
+                    </label>
+                    <input className={`${input} text-lg font-bold`} type="number" step="0.5" min="0"
+                      value={actualWeight}
+                      onChange={e => setPhase({ ...phase, actualWeight: e.target.value })}
+                      placeholder="BW" />
                   </div>
                 </div>
                 <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-xs text-slate-500 mb-1.5 uppercase tracking-wide">
-                      <span className="text-amber-400">R</span> Weight ({wt})
-                    </label>
-                    <input className={`${input} text-lg font-bold`} type="number" step="0.5" min="0"
-                      value={phase.actualWeightRight}
-                      onChange={e => setPhase({ ...phase, actualWeightRight: e.target.value })}
-                      placeholder="BW" />
-                  </div>
                   <div>
                     <label className="block text-xs text-slate-500 mb-1.5 uppercase tracking-wide">
                       <span className="text-amber-400">R</span> Reps
@@ -403,22 +394,20 @@ export default function GuidedWorkoutPage() {
                       onChange={e => setPhase({ ...phase, actualRepsRight: e.target.value })}
                       placeholder="reps" />
                   </div>
+                  <div>
+                    <label className="block text-xs text-slate-500 mb-1.5 uppercase tracking-wide">
+                      <span className="text-amber-400">R</span> Weight ({wt})
+                    </label>
+                    <input className={`${input} text-lg font-bold`} type="number" step="0.5" min="0"
+                      value={phase.actualWeightRight}
+                      onChange={e => setPhase({ ...phase, actualWeightRight: e.target.value })}
+                      placeholder="BW" />
+                  </div>
                 </div>
               </div>
             ) : (
               /* Standard bilateral */
               <div className="grid grid-cols-2 gap-3 mb-3">
-                <div>
-                  <label className="block text-xs text-slate-500 mb-1.5 uppercase tracking-wide">Weight ({wt})</label>
-                  <input
-                    className={`${input} text-lg font-bold`}
-                    type="number" step="0.5" min="0"
-                    value={actualWeight}
-                    onChange={e => setPhase({ ...phase, actualWeight: e.target.value })}
-                    placeholder="BW"
-                    autoFocus
-                  />
-                </div>
                 <div>
                   <label className="block text-xs text-slate-500 mb-1.5 uppercase tracking-wide">Reps</label>
                   <input
@@ -427,6 +416,17 @@ export default function GuidedWorkoutPage() {
                     value={actualReps}
                     onChange={e => setPhase({ ...phase, actualReps: e.target.value })}
                     placeholder="reps"
+                    autoFocus
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs text-slate-500 mb-1.5 uppercase tracking-wide">Weight ({wt})</label>
+                  <input
+                    className={`${input} text-lg font-bold`}
+                    type="number" step="0.5" min="0"
+                    value={actualWeight}
+                    onChange={e => setPhase({ ...phase, actualWeight: e.target.value })}
+                    placeholder="BW"
                   />
                 </div>
               </div>

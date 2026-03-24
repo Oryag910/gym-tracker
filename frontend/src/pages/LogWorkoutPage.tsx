@@ -336,11 +336,11 @@ export default function LogWorkoutPage() {
                     {/* Column headers */}
                     {ex.is_unilateral ? (
                       <div className="grid grid-cols-[24px_28px_1fr_1fr] gap-2 text-xs text-slate-500 px-1">
-                        <span>Set</span><span>Side</span><span>Weight ({wt})</span><span>Reps</span>
+                        <span>Set</span><span>Side</span><span>Reps</span><span>Weight ({wt})</span>
                       </div>
                     ) : (
                       <div className="grid grid-cols-[24px_1fr_1fr_52px_24px] gap-2 text-xs text-slate-500 px-1">
-                        <span>Set</span><span>Weight ({wt})</span><span>Reps</span><span>RPE</span><span />
+                        <span>Set</span><span>Reps</span><span>Weight ({wt})</span><span>RPE</span><span />
                       </div>
                     )}
                     <AnimatePresence>
@@ -361,17 +361,17 @@ export default function LogWorkoutPage() {
                                 <span className="text-[11px] font-bold text-blue-400">L</span>
                                 <input
                                   className={input}
-                                  type="number" step="0.5" min="0"
-                                  value={s.weight}
-                                  onChange={e => updateSet(ei, si, 'weight', e.target.value)}
-                                  placeholder="BW"
-                                />
-                                <input
-                                  className={input}
                                   type="number" min="0"
                                   value={s.reps}
                                   onChange={e => updateSet(ei, si, 'reps', e.target.value)}
                                   placeholder="reps"
+                                />
+                                <input
+                                  className={input}
+                                  type="number" step="0.5" min="0"
+                                  value={s.weight}
+                                  onChange={e => updateSet(ei, si, 'weight', e.target.value)}
+                                  placeholder="BW"
                                 />
                               </div>
                               {/* R row */}
@@ -380,17 +380,17 @@ export default function LogWorkoutPage() {
                                 <span className="text-[11px] font-bold text-amber-400">R</span>
                                 <input
                                   className={input}
-                                  type="number" step="0.5" min="0"
-                                  value={s.weight_right}
-                                  onChange={e => updateSet(ei, si, 'weight_right', e.target.value)}
-                                  placeholder="BW"
-                                />
-                                <input
-                                  className={input}
                                   type="number" min="0"
                                   value={s.reps_right}
                                   onChange={e => updateSet(ei, si, 'reps_right', e.target.value)}
                                   placeholder="reps"
+                                />
+                                <input
+                                  className={input}
+                                  type="number" step="0.5" min="0"
+                                  value={s.weight_right}
+                                  onChange={e => updateSet(ei, si, 'weight_right', e.target.value)}
+                                  placeholder="BW"
                                 />
                                 <input
                                   className={input}
@@ -410,17 +410,17 @@ export default function LogWorkoutPage() {
                               <span className="text-slate-500 text-sm text-center">{si + 1}</span>
                               <input
                                 className={input}
-                                type="number" step="0.5" min="0"
-                                value={s.weight}
-                                onChange={e => updateSet(ei, si, 'weight', e.target.value)}
-                                placeholder="BW"
-                              />
-                              <input
-                                className={input}
                                 type="number" min="0"
                                 value={s.reps}
                                 onChange={e => updateSet(ei, si, 'reps', e.target.value)}
                                 placeholder="reps"
+                              />
+                              <input
+                                className={input}
+                                type="number" step="0.5" min="0"
+                                value={s.weight}
+                                onChange={e => updateSet(ei, si, 'weight', e.target.value)}
+                                placeholder="BW"
                               />
                               <input
                                 className={input}

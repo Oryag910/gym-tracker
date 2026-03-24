@@ -290,21 +290,21 @@ export default function TemplateFormPage() {
                   {/* Sets */}
                   <div className="space-y-2 mb-3">
                     <div className="grid grid-cols-[32px_1fr_1fr_28px] gap-2 text-xs text-slate-500 px-1">
-                      <span>Set</span><span>Target weight ({wt})</span><span>Target reps</span><span />
+                      <span>Set</span><span>Target reps</span><span>Target weight ({wt})</span><span />
                     </div>
                     <AnimatePresence>
                       {ex.sets.map((s, si) => (
                         <motion.div key={si} layout initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
                           className="grid grid-cols-[32px_1fr_1fr_28px] gap-2 items-center">
                           <span className="text-slate-500 text-sm text-center">{si + 1}</span>
-                          <input className={input} type="number" step="0.5" min="0"
-                            value={s.target_weight}
-                            onChange={e => updateSet(ei, si, 'target_weight', e.target.value)}
-                            placeholder="BW" />
                           <input className={input} type="number" min="0"
                             value={s.target_reps}
                             onChange={e => updateSet(ei, si, 'target_reps', e.target.value)}
                             placeholder="reps" />
+                          <input className={input} type="number" step="0.5" min="0"
+                            value={s.target_weight}
+                            onChange={e => updateSet(ei, si, 'target_weight', e.target.value)}
+                            placeholder="BW" />
                           {ex.sets.length > 1 ? (
                             <button type="button" onClick={() => removeSet(ei, si)} className="text-slate-600 hover:text-red-400 transition-colors text-lg leading-none">×</button>
                           ) : <span />}

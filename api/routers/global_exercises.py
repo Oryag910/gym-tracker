@@ -2,7 +2,6 @@ import json
 import json as json_lib
 import os
 
-import google.generativeai as genai
 import httpx
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
@@ -235,9 +234,13 @@ async def suggest_muscles(
     if not api_key:
         raise HTTPException(status_code=503, detail="GEMINI_API_KEY not configured")
 
+    # Lazy import — if the package is missing, only this endpoint fails (not the whole module)
+    try:
+        import google.generativeai as genai
+    except ImportError:
+        raise HTTPException(status_code=503, detail="google-generativeai package not installed on server")
+
     muscle_list = "\n".join(f"{k}: {v}" for k, v in MUSCLE_MAP.items())
-    genai.configure(api_key=api_key)
-    model = genai.GenerativeModel("gemini-1.5-flash")
 
     prompt = (
         f'You are a fitness anatomy expert. For the exercise "{body.name}", '
@@ -251,14 +254,17 @@ async def suggest_muscles(
         f"- Only use IDs from the list above"
     )
 
-    response = model.generate_content(prompt)
-
     try:
+        genai.configure(api_key=api_key)
+        model = genai.GenerativeModel("gemini-1.5-flash")
+        response = model.generate_content(prompt)
         # Strip markdown code fences if Gemini wraps the JSON
         text = response.text.strip().removeprefix("```json").removeprefix("```").removesuffix("```").strip()
         result = json_lib.loads(text)
-    except Exception:
-        raise HTTPException(status_code=500, detail="Failed to parse AI response")
+    except json_lib.JSONDecodeError:
+        raise HTTPException(status_code=500, detail="Failed to parse AI response — Gemini returned unexpected output")
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"Gemini API error: {str(e)}")
 
     valid = set(MUSCLE_MAP.keys())
     primary = [i for i in result.get("primary", []) if i in valid]

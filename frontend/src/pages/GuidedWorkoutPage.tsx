@@ -259,6 +259,17 @@ export default function GuidedWorkoutPage() {
     goToActive(template, exerciseIndex + 1, 0, completedSets)
   }
 
+  // Skip this exercise but requeue it at the end so the user can come back
+  const skipExerciseReturnLater = (p: Extract<Phase, { kind: 'active' }>) => {
+    const { template, exerciseIndex, completedSets } = p
+    const currentEx = template.exercises[exerciseIndex]
+    // Append a copy with a temporary negative id (avoids React key collisions)
+    const requeued = { ...currentEx, id: -(Date.now()) }
+    const newExercises = [...template.exercises, requeued]
+    const newTemplate = { ...template, exercises: newExercises }
+    goToActive(newTemplate, exerciseIndex + 1, 0, completedSets)
+  }
+
   // Clone the last set's targets and append it to the current exercise plan
   const addExtraSet = (p: Extract<Phase, { kind: 'active' }>) => {
     const { template, exerciseIndex } = p
@@ -553,13 +564,22 @@ export default function GuidedWorkoutPage() {
               >
                 Skip Set
               </button>
+              {/* Return Later — always available, requeues at end */}
+              <button
+                type="button"
+                onClick={() => skipExerciseReturnLater(phase)}
+                className="flex-1 py-2 rounded-xl border border-slate-700 text-slate-400 text-sm hover:border-slate-500 hover:text-slate-300 transition-colors"
+              >
+                ↩ Return Later
+              </button>
+              {/* Skip completely — only when there's a next exercise */}
               {exerciseIndex + 1 < template.exercises.length && (
                 <button
                   type="button"
                   onClick={() => skipExercise(phase)}
                   className="flex-1 py-2 rounded-xl border border-slate-700 text-slate-400 text-sm hover:border-slate-500 hover:text-slate-300 transition-colors"
                 >
-                  Skip Exercise
+                  Skip
                 </button>
               )}
               <button

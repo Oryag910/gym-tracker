@@ -236,9 +236,9 @@ async def suggest_muscles(
 
     # Lazy import — if the package is missing, only this endpoint fails (not the whole module)
     try:
-        import google.generativeai as genai
+        from google import genai
     except ImportError:
-        raise HTTPException(status_code=503, detail="google-generativeai package not installed on server")
+        raise HTTPException(status_code=503, detail="google-genai package not installed on server")
 
     muscle_list = "\n".join(f"{k}: {v}" for k, v in MUSCLE_MAP.items())
 
@@ -255,9 +255,11 @@ async def suggest_muscles(
     )
 
     try:
-        genai.configure(api_key=api_key)
-        model = genai.GenerativeModel("gemini-2.0-flash")
-        response = model.generate_content(prompt)
+        client = genai.Client(api_key=api_key)
+        response = client.models.generate_content(
+            model="gemini-2.0-flash",
+            contents=prompt,
+        )
         # Strip markdown code fences if Gemini wraps the JSON
         text = response.text.strip().removeprefix("```json").removeprefix("```").removesuffix("```").strip()
         result = json_lib.loads(text)

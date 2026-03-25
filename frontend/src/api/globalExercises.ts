@@ -52,7 +52,3 @@ export const importFromWger = (limit = 50, offset = 0) =>
     `/library/import-wger?limit=${limit}&offset=${offset}`
   )
 
-export const suggestMuscles = (name: string) =>
-  client.post<{ muscles_primary_ids: number[]; muscles_secondary_ids: number[] }>(
-    '/library/suggest-muscles', { name }
-  )

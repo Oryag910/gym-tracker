@@ -234,12 +234,6 @@ async def suggest_muscles(
     if not api_key:
         raise HTTPException(status_code=503, detail="GEMINI_API_KEY not configured")
 
-    # Lazy import — if the package is missing, only this endpoint fails (not the whole module)
-    try:
-        from google import genai
-    except ImportError:
-        raise HTTPException(status_code=503, detail="google-genai package not installed on server")
-
     muscle_list = "\n".join(f"{k}: {v}" for k, v in MUSCLE_MAP.items())
 
     prompt = (
@@ -255,18 +249,25 @@ async def suggest_muscles(
     )
 
     try:
-        client = genai.Client(api_key=api_key)
-        response = client.models.generate_content(
-            model="gemini-1.5-flash",
-            contents=prompt,
-        )
-        # Strip markdown code fences if Gemini wraps the JSON
-        text = response.text.strip().removeprefix("```json").removeprefix("```").removesuffix("```").strip()
+        # Call Gemini REST API directly — no SDK, no version conflicts
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            resp = await client.post(
+                "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent",
+                params={"key": api_key},
+                json={"contents": [{"parts": [{"text": prompt}]}]},
+            )
+        if resp.status_code != 200:
+            raise HTTPException(status_code=502, detail=f"Gemini API error: {resp.status_code} {resp.json().get('error', {}).get('message', resp.text[:200])}")
+        data = resp.json()
+        text = data["candidates"][0]["content"]["parts"][0]["text"]
+        text = text.strip().removeprefix("```json").removeprefix("```").removesuffix("```").strip()
         result = json_lib.loads(text)
+    except HTTPException:
+        raise
     except json_lib.JSONDecodeError:
         raise HTTPException(status_code=500, detail="Failed to parse AI response — Gemini returned unexpected output")
     except Exception as e:
-        raise HTTPException(status_code=502, detail=f"Gemini API error: {str(e)}")
+        raise HTTPException(status_code=502, detail=f"Gemini request failed: {str(e)}")
 
     valid = set(MUSCLE_MAP.keys())
     primary = [i for i in result.get("primary", []) if i in valid]

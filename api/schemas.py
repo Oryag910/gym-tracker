@@ -373,6 +373,20 @@ class TemplateResponse(BaseModel):
         from_attributes = True
 
 
+# --- Exercise editing (add/update exercises on an existing workout) ---
+
+class ExerciseAddRequest(BaseModel):
+    name: str
+    is_unilateral: bool = False
+    attachment: Optional[str] = None
+
+
+class ExerciseUpdateRequest(BaseModel):
+    name: Optional[str] = None
+    is_unilateral: Optional[bool] = None
+    attachment: Optional[str] = None
+
+
 # --- Custom Exercise Library ---
 
 class CustomExerciseCreate(BaseModel):

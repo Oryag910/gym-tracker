@@ -33,3 +33,18 @@ export const updateWorkout = (id: number, data: { name?: string; date?: string }
 export const deleteWorkout = (id: number) => client.delete(`/workouts/${id}`)
 export const updateSet = (workoutId: number, exerciseId: number, setId: number, data: { weight?: number; reps?: number; rpe?: number; weight_right?: number; reps_right?: number }) =>
   client.put(`/workouts/${workoutId}/exercises/${exerciseId}/sets/${setId}`, data)
+
+export const addExercise = (workoutId: number, data: { name: string; is_unilateral?: boolean; attachment?: string | null }) =>
+  client.post<ExerciseResponse>(`/workouts/${workoutId}/exercises`, data)
+
+export const updateExercise = (workoutId: number, exerciseId: number, data: { name?: string; is_unilateral?: boolean; attachment?: string | null }) =>
+  client.put<ExerciseResponse>(`/workouts/${workoutId}/exercises/${exerciseId}`, data)
+
+export const deleteExercise = (workoutId: number, exerciseId: number) =>
+  client.delete(`/workouts/${workoutId}/exercises/${exerciseId}`)
+
+export const addSet = (workoutId: number, exerciseId: number, data: { weight?: number | null; reps?: number | null; rpe?: number | null; weight_right?: number | null; reps_right?: number | null }) =>
+  client.post<SetResponse>(`/workouts/${workoutId}/exercises/${exerciseId}/sets`, data)
+
+export const deleteSet = (workoutId: number, exerciseId: number, setId: number) =>
+  client.delete(`/workouts/${workoutId}/exercises/${exerciseId}/sets/${setId}`)

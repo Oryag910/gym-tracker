@@ -385,17 +385,17 @@ export default function LogWorkoutPage() {
                             Hide
                           </button>
                         </div>
-                        <div className="flex gap-4 items-start mb-3">
+                        <div className="flex flex-col sm:flex-row gap-4 items-start mb-3">
                           {ex.lookup.image_url && (
                             <img
                               src={ex.lookup.image_url}
                               alt={ex.lookup.canonical_name ?? ex.name}
-                              className="flex-1 min-w-0 rounded-xl object-cover bg-slate-700"
+                              className="w-full sm:flex-1 sm:min-w-0 rounded-xl object-cover bg-slate-700"
                               style={{ height: '200px' }}
                               onError={e => { (e.target as HTMLImageElement).style.display = 'none' }}
                             />
                           )}
-                          <div className="shrink-0">
+                          <div className="sm:shrink-0 mx-auto sm:mx-0">
                             <MuscleMap
                               primary={ex.lookup.muscles_primary}
                               secondary={ex.lookup.muscles_secondary}

@@ -90,37 +90,42 @@ export default function ComparePage({ embedded }: Props) {
           animate={{ opacity: 1, y: 0 }}
           className={`${card} overflow-hidden p-0`}
         >
-          {/* Header row */}
-          <div className="grid grid-cols-3 bg-slate-900 px-5 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">
-            <div>Exercise</div>
-            <div className="text-blue-400">{result.workout_a.name} <span className="text-slate-600">({result.workout_a.date})</span></div>
-            <div className="text-emerald-400">{result.workout_b.name} <span className="text-slate-600">({result.workout_b.date})</span></div>
-          </div>
-
-          {result.exercises.map((ex: CompareExercise, i) => {
-            const volA = volumeOf(ex.workout_a)
-            const volB = volumeOf(ex.workout_b)
-            const aWins = ex.workout_a && volA > volB
-            const bWins = ex.workout_b && volB > volA
-            return (
-              <div
-                key={ex.exercise}
-                className={`grid grid-cols-3 px-5 py-3.5 text-sm ${i % 2 === 0 ? 'bg-slate-800' : 'bg-slate-800/50'} border-t border-slate-700/50`}
-              >
-                <div className="font-semibold text-slate-100 capitalize">{ex.exercise}</div>
-                <div className={`space-y-0.5 ${aWins ? 'text-blue-300' : 'text-slate-400'}`}>
-                  {ex.workout_a
-                    ? ex.workout_a.map((s, si) => <div key={si} className="text-xs">{formatSet(s)}</div>)
-                    : <span className="text-slate-600">—</span>}
-                </div>
-                <div className={`space-y-0.5 ${bWins ? 'text-emerald-300' : 'text-slate-400'}`}>
-                  {ex.workout_b
-                    ? ex.workout_b.map((s, si) => <div key={si} className="text-xs">{formatSet(s)}</div>)
-                    : <span className="text-slate-600">—</span>}
-                </div>
+          {/* Wrap in overflow-x-auto so the 3-col table scrolls on narrow screens */}
+          <div className="overflow-x-auto">
+            <div className="min-w-[440px]">
+              {/* Header row */}
+              <div className="grid grid-cols-3 bg-slate-900 px-5 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">
+                <div>Exercise</div>
+                <div className="text-blue-400 truncate">{result.workout_a.name} <span className="text-slate-600">({result.workout_a.date})</span></div>
+                <div className="text-emerald-400 truncate">{result.workout_b.name} <span className="text-slate-600">({result.workout_b.date})</span></div>
               </div>
-            )
-          })}
+
+              {result.exercises.map((ex: CompareExercise, i) => {
+                const volA = volumeOf(ex.workout_a)
+                const volB = volumeOf(ex.workout_b)
+                const aWins = ex.workout_a && volA > volB
+                const bWins = ex.workout_b && volB > volA
+                return (
+                  <div
+                    key={ex.exercise}
+                    className={`grid grid-cols-3 px-5 py-3.5 text-sm ${i % 2 === 0 ? 'bg-slate-800' : 'bg-slate-800/50'} border-t border-slate-700/50`}
+                  >
+                    <div className="font-semibold text-slate-100 capitalize">{ex.exercise}</div>
+                    <div className={`space-y-0.5 ${aWins ? 'text-blue-300' : 'text-slate-400'}`}>
+                      {ex.workout_a
+                        ? ex.workout_a.map((s, si) => <div key={si} className="text-xs">{formatSet(s)}</div>)
+                        : <span className="text-slate-600">—</span>}
+                    </div>
+                    <div className={`space-y-0.5 ${bWins ? 'text-emerald-300' : 'text-slate-400'}`}>
+                      {ex.workout_b
+                        ? ex.workout_b.map((s, si) => <div key={si} className="text-xs">{formatSet(s)}</div>)
+                        : <span className="text-slate-600">—</span>}
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
         </motion.div>
       )}
     </div>

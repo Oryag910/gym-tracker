@@ -257,7 +257,7 @@ async def suggest_muscles(
     try:
         client = genai.Client(api_key=api_key)
         response = client.models.generate_content(
-            model="gemini-2.0-flash",
+            model="gemini-1.5-flash",
             contents=prompt,
         )
         # Strip markdown code fences if Gemini wraps the JSON

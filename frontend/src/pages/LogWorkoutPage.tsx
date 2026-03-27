@@ -105,14 +105,24 @@ export default function LogWorkoutPage() {
   const [library, setLibrary] = useState<GlobalExercise[]>([])
   const pickerRefs = useRef<(HTMLDivElement | null)[]>([])
 
-  // State for the draft restore banner
-  const [showDraftBanner, setShowDraftBanner] = useState(false)
-
   useEffect(() => {
     listExercises().then(r => setLibrary(r.data)).catch(() => {})
     listTemplates().then(r => { setTemplates(r.data); setLoadingTemplates(false) }).catch(() => setLoadingTemplates(false))
-    // On mount: check if there's a saved draft to restore
-    if (localStorage.getItem('workout_draft')) setShowDraftBanner(true)
+    // Auto-restore any saved draft — bring the user straight back to their workout
+    // without requiring them to notice a banner and click "Restore".
+    const raw = localStorage.getItem('workout_draft')
+    if (raw) {
+      try {
+        const draft = JSON.parse(raw)
+        if (draft.name) setName(draft.name)
+        if (draft.date) setDate(draft.date)
+        if (draft.exercises?.length) setExercises(draft.exercises)
+        setMode('free')
+        localStorage.removeItem('workout_draft')
+      } catch {
+        localStorage.removeItem('workout_draft') // discard corrupted draft
+      }
+    }
   }, [])
 
   // Keep a ref with the latest form values so the unmount cleanup can read them.
@@ -152,25 +162,6 @@ export default function LogWorkoutPage() {
     window.addEventListener('beforeunload', handler)
     return () => window.removeEventListener('beforeunload', handler)
   }, [exercises, saved])
-
-  const restoreDraft = () => {
-    try {
-      const raw = localStorage.getItem('workout_draft')
-      if (!raw) return
-      const draft = JSON.parse(raw)
-      if (draft.name) setName(draft.name)
-      if (draft.date) setDate(draft.date)
-      if (draft.exercises) setExercises(draft.exercises)
-      setMode('free')
-    } catch {}
-    localStorage.removeItem('workout_draft')
-    setShowDraftBanner(false)
-  }
-
-  const discardDraft = () => {
-    localStorage.removeItem('workout_draft')
-    setShowDraftBanner(false)
-  }
 
   const updateExercise = (i: number, patch: Partial<ExerciseForm>) =>
     setExercises(prev => prev.map((ex, idx) => idx === i ? { ...ex, ...patch } : ex))
@@ -246,17 +237,6 @@ export default function LogWorkoutPage() {
         <div className="space-y-6 max-w-2xl mx-auto">
           <h1 className="text-2xl font-black text-slate-100 tracking-tight">Log Workout</h1>
 
-          {/* Draft restore banner */}
-          {showDraftBanner && (
-            <div className="bg-amber-500/10 border border-amber-500/30 rounded-xl px-4 py-3 flex items-center justify-between gap-3">
-              <span className="text-sm text-amber-200">You have an unsaved workout draft.</span>
-              <div className="flex gap-2 shrink-0">
-                <button onClick={restoreDraft} className="text-xs font-semibold text-amber-300 hover:text-amber-100 transition-colors">Restore</button>
-                <button onClick={discardDraft} className="text-xs text-slate-500 hover:text-slate-300 transition-colors">Discard</button>
-              </div>
-            </div>
-          )}
-
           {/* Template list */}
           {loadingTemplates ? (
             <div className="space-y-3">
@@ -327,6 +307,19 @@ export default function LogWorkoutPage() {
             </svg>
           </button>
           <h1 className="text-2xl font-black text-slate-100 tracking-tight">Log Workout</h1>
+          {/* Start fresh — discard the current draft and reset the form */}
+          <button
+            type="button"
+            onClick={() => {
+              setName('')
+              setDate(today())
+              setExercises([emptyExercise()])
+              localStorage.removeItem('workout_draft')
+            }}
+            className="ml-auto text-xs text-slate-500 hover:text-red-400 transition-colors"
+          >
+            Start fresh
+          </button>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-5">

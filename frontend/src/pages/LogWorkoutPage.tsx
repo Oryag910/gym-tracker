@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { useNavigate, useBlocker } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { createWorkout } from '../api/workouts'
 import { listTemplates } from '../api/templates'
@@ -107,8 +107,6 @@ export default function LogWorkoutPage() {
 
   // State for the draft restore banner
   const [showDraftBanner, setShowDraftBanner] = useState(false)
-  // State for the in-app navigation guard modal
-  const [showNavModal, setShowNavModal] = useState(false)
 
   useEffect(() => {
     listExercises().then(r => setLibrary(r.data)).catch(() => {})
@@ -143,20 +141,6 @@ export default function LogWorkoutPage() {
     window.addEventListener('beforeunload', handler)
     return () => window.removeEventListener('beforeunload', handler)
   }, [exercises, saved])
-
-  // Block in-app navigation while mid-workout (React Router v7 useBlocker)
-  const blocker = useBlocker(
-    ({ currentLocation, nextLocation }) =>
-      mode === 'free' &&
-      exercises.some(ex => ex.name) &&
-      !saved &&
-      currentLocation.pathname !== nextLocation.pathname
-  )
-  // When blocker fires, show our custom modal instead of the default browser prompt
-  useEffect(() => {
-    if (blocker.state === 'blocked') setShowNavModal(true)
-    else setShowNavModal(false)
-  }, [blocker.state])
 
   const restoreDraft = () => {
     try {
@@ -325,40 +309,6 @@ export default function LogWorkoutPage() {
   return (
     <PageTransition>
       <div className="space-y-6 max-w-2xl mx-auto">
-        {/* In-app navigation guard modal */}
-        <AnimatePresence>
-          {showNavModal && blocker.state === 'blocked' && (
-            <motion.div
-              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-              className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center z-50 px-4"
-            >
-              <motion.div
-                initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }}
-                className="bg-slate-900 border border-slate-700 rounded-2xl p-6 w-full max-w-sm"
-              >
-                <h2 className="text-lg font-bold text-slate-100 mb-2">Leave workout?</h2>
-                <p className="text-slate-400 text-sm mb-6">
-                  Your draft has been saved. You can restore it when you come back to Log Workout.
-                </p>
-                <div className="flex gap-3">
-                  <button
-                    onClick={() => blocker.proceed?.()}
-                    className="flex-1 bg-slate-700 text-slate-200 font-medium rounded-xl py-2.5 hover:bg-slate-600 transition-all"
-                  >
-                    Leave
-                  </button>
-                  <button
-                    onClick={() => blocker.reset?.()}
-                    className="flex-1 bg-blue-500 text-slate-950 font-bold rounded-xl py-2.5 hover:bg-blue-400 active:scale-95 transition-all"
-                  >
-                    Stay
-                  </button>
-                </div>
-              </motion.div>
-            </motion.div>
-          )}
-        </AnimatePresence>
-
         <div className="flex items-center gap-3">
           <button type="button" onClick={() => setMode('choose')} className="text-slate-500 hover:text-slate-300 transition-colors">
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">

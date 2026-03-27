@@ -115,20 +115,31 @@ export default function LogWorkoutPage() {
     if (localStorage.getItem('workout_draft')) setShowDraftBanner(true)
   }, [])
 
-  // Auto-save draft to localStorage whenever the form changes.
-  // Using a ref-based debounce so we don't write on every single keystroke.
-  const draftTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  // Keep a ref with the latest form values so the unmount cleanup can read them.
+  // (Cleanup functions capture a stale closure, so we need a ref for current values.)
+  const draftRef = useRef({ name, date, exercises, mode, saved })
+  useEffect(() => { draftRef.current = { name, date, exercises, mode, saved } })
+
+  // Auto-save draft to localStorage on every meaningful change.
+  // localStorage writes are synchronous and fast — no debounce needed.
+  // Previously we debounced this, but the cleanup function cancelled the
+  // pending timeout before it fired when the user navigated away.
   useEffect(() => {
-    // Only save a draft if the user is in free-log mode with some data
-    if (mode !== 'free') return
-    if (draftTimerRef.current) clearTimeout(draftTimerRef.current)
-    draftTimerRef.current = setTimeout(() => {
-      if (exercises.some(ex => ex.name) || name) {
+    if (mode !== 'free' || saved) return
+    if (exercises.some(ex => ex.name) || name) {
+      localStorage.setItem('workout_draft', JSON.stringify({ name, date, exercises }))
+    }
+  }, [exercises, name, date, mode, saved])
+
+  // Save draft on unmount (catches navigation that happens before the above effect runs)
+  useEffect(() => {
+    return () => {
+      const { name, date, exercises, mode, saved } = draftRef.current
+      if (mode === 'free' && !saved && (exercises.some(ex => ex.name) || name)) {
         localStorage.setItem('workout_draft', JSON.stringify({ name, date, exercises }))
       }
-    }, 500)
-    return () => { if (draftTimerRef.current) clearTimeout(draftTimerRef.current) }
-  }, [exercises, name, date, mode])
+    }
+  }, []) // empty deps — only runs once, on unmount
 
   // Warn if user tries to close/refresh the tab while mid-workout
   useEffect(() => {

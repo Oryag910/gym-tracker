@@ -126,9 +126,10 @@ export default function LogWorkoutPage() {
   }, [])
 
   // Keep a ref with the latest form values so the unmount cleanup can read them.
-  // (Cleanup functions capture a stale closure, so we need a ref for current values.)
+  // Assigned inline (not in a useEffect) so it's always current — even if the component
+  // unmounts before the next effect batch runs (which caused stale saves before).
   const draftRef = useRef({ name, date, exercises, mode, saved })
-  useEffect(() => { draftRef.current = { name, date, exercises, mode, saved } })
+  draftRef.current = { name, date, exercises, mode, saved }
 
   // Auto-save draft to localStorage on every meaningful change.
   // localStorage writes are synchronous and fast — no debounce needed.

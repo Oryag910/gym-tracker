@@ -131,18 +131,25 @@ export default function LogWorkoutPage() {
   const draftRef = useRef({ name, date, exercises, mode, saved })
   draftRef.current = { name, date, exercises, mode, saved }
 
-  // Auto-save draft to localStorage on every meaningful change.
-  // localStorage writes are synchronous and fast — no debounce needed.
-  // Previously we debounced this, but the cleanup function cancelled the
-  // pending timeout before it fired when the user navigated away.
-  useEffect(() => {
+  // Save draft synchronously inside every mutation — called before setExercises so
+  // localStorage is updated in the same JS task as the user's action.
+  // nextName / nextDate let callers pass a just-typed value before React has committed it.
+  const saveDraftWith = (
+    nextExercises: ExerciseForm[],
+    nextName = name,
+    nextDate = date,
+  ) => {
     if (mode !== 'free' || saved) return
-    if (exercises.some(ex => ex.name) || name) {
-      localStorage.setItem('workout_draft', JSON.stringify({ name, date, exercises }))
+    if (nextExercises.some(ex => ex.name) || nextName) {
+      localStorage.setItem(
+        'workout_draft',
+        JSON.stringify({ name: nextName, date: nextDate, exercises: nextExercises }),
+      )
     }
-  }, [exercises, name, date, mode, saved])
+  }
 
-  // Save draft on unmount (catches navigation that happens before the above effect runs)
+  // Save draft on unmount — belt-and-suspenders in case the user navigates away
+  // before any mutation has fired (e.g. restoring a draft and immediately leaving again)
   useEffect(() => {
     return () => {
       const { name, date, exercises, mode, saved } = draftRef.current
@@ -164,8 +171,11 @@ export default function LogWorkoutPage() {
     return () => window.removeEventListener('beforeunload', handler)
   }, [exercises, saved])
 
-  const updateExercise = (i: number, patch: Partial<ExerciseForm>) =>
-    setExercises(prev => prev.map((ex, idx) => idx === i ? { ...ex, ...patch } : ex))
+  const updateExercise = (i: number, patch: Partial<ExerciseForm>) => {
+    const next = exercises.map((ex, idx) => idx === i ? { ...ex, ...patch } : ex)
+    saveDraftWith(next)
+    setExercises(next)
+  }
 
   const selectLibraryExercise = (ei: number, libEx: GlobalExercise) => {
     const lookup = libraryToLookup(libEx)
@@ -182,20 +192,38 @@ export default function LogWorkoutPage() {
     updateExercise(i, { filter: val, showPicker: true, name: '', lookup: null, showMuscles: false })
   }
 
-  const addExercise = () => setExercises(prev => [...prev, emptyExercise()])
-  const removeExercise = (i: number) => setExercises(prev => prev.filter((_, idx) => idx !== i))
+  const addExercise = () => {
+    const next = [...exercises, emptyExercise()]
+    saveDraftWith(next)
+    setExercises(next)
+  }
 
-  const addSet = (i: number) =>
-    setExercises(prev => prev.map((ex, idx) =>
-      idx === i ? { ...ex, sets: [...ex.sets, emptySet()] } : ex))
+  const removeExercise = (i: number) => {
+    const next = exercises.filter((_, idx) => idx !== i)
+    saveDraftWith(next)
+    setExercises(next)
+  }
 
-  const removeSet = (ei: number, si: number) =>
-    setExercises(prev => prev.map((ex, idx) =>
-      idx === ei ? { ...ex, sets: ex.sets.filter((_, s) => s !== si) } : ex))
+  const addSet = (i: number) => {
+    const next = exercises.map((ex, idx) =>
+      idx === i ? { ...ex, sets: [...ex.sets, emptySet()] } : ex)
+    saveDraftWith(next)
+    setExercises(next)
+  }
 
-  const updateSet = (ei: number, si: number, field: keyof SetForm, val: string) =>
-    setExercises(prev => prev.map((ex, idx) =>
-      idx === ei ? { ...ex, sets: ex.sets.map((s, sidx) => sidx === si ? { ...s, [field]: val } : s) } : ex))
+  const removeSet = (ei: number, si: number) => {
+    const next = exercises.map((ex, idx) =>
+      idx === ei ? { ...ex, sets: ex.sets.filter((_, s) => s !== si) } : ex)
+    saveDraftWith(next)
+    setExercises(next)
+  }
+
+  const updateSet = (ei: number, si: number, field: keyof SetForm, val: string) => {
+    const next = exercises.map((ex, idx) =>
+      idx === ei ? { ...ex, sets: ex.sets.map((s, sidx) => sidx === si ? { ...s, [field]: val } : s) } : ex)
+    saveDraftWith(next)
+    setExercises(next)
+  }
 
   const handleSubmit = async (e: { preventDefault(): void }) => {
     e.preventDefault()
@@ -328,11 +356,11 @@ export default function LogWorkoutPage() {
           <div className="flex gap-3">
             <div className="flex-1">
               <label className="block text-xs font-medium text-slate-400 uppercase tracking-wide mb-1.5">Name</label>
-              <input className={input} value={name} onChange={e => setName(e.target.value)} placeholder="e.g. Push Day" required />
+              <input className={input} value={name} onChange={e => { setName(e.target.value); saveDraftWith(exercises, e.target.value) }} placeholder="e.g. Push Day" required />
             </div>
             <div className="w-40">
               <label className="block text-xs font-medium text-slate-400 uppercase tracking-wide mb-1.5">Date</label>
-              <input className={input} type="date" value={date} onChange={e => setDate(e.target.value)} required />
+              <input className={input} type="date" value={date} onChange={e => { setDate(e.target.value); saveDraftWith(exercises, name, e.target.value) }} required />
             </div>
           </div>
 

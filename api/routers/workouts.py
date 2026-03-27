@@ -50,6 +50,7 @@ def create_workout(body: WorkoutCreate, current_user: User = Depends(get_current
             name=ex_data.name,
             order_index=idx,
             is_unilateral=ex_data.is_unilateral,
+            is_timed=ex_data.is_timed,
             attachment=ex_data.attachment,
         )
         db.add(exercise)
@@ -63,6 +64,7 @@ def create_workout(body: WorkoutCreate, current_user: User = Depends(get_current
                 rpe=set_data.rpe,
                 weight_right=set_data.weight_right,
                 reps_right=set_data.reps_right,
+                duration=set_data.duration,
                 set_number=set_num,
             )
             db.add(s)
@@ -131,11 +133,14 @@ def update_set(
         set_.weight_right = body.weight_right
     if body.reps_right is not None:
         set_.reps_right = body.reps_right
+    if body.duration is not None:
+        set_.duration = body.duration
     db.commit()
     return {
         "id": set_.id,
         "weight": set_.weight, "reps": set_.reps, "rpe": set_.rpe,
         "weight_right": set_.weight_right, "reps_right": set_.reps_right,
+        "duration": set_.duration,
     }
 
 
@@ -155,6 +160,7 @@ def add_exercise(
         name=body.name.strip(),
         order_index=max_order + 1,
         is_unilateral=body.is_unilateral,
+        is_timed=body.is_timed,
         attachment=body.attachment,
     )
     db.add(exercise)
@@ -185,6 +191,8 @@ def update_exercise(
         exercise.name = body.name.strip()
     if body.is_unilateral is not None:
         exercise.is_unilateral = body.is_unilateral
+    if body.is_timed is not None:
+        exercise.is_timed = body.is_timed
     if body.attachment is not None:
         exercise.attachment = body.attachment
     db.commit()
@@ -232,6 +240,7 @@ def add_set(
         rpe=body.rpe,
         weight_right=body.weight_right,
         reps_right=body.reps_right,
+        duration=body.duration,
     )
     db.add(s)
     db.commit()

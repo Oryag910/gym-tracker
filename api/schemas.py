@@ -67,6 +67,7 @@ class SetCreate(BaseModel):
     rpe: Optional[int] = None
     weight_right: Optional[float] = None   # right side weight for unilateral exercises
     reps_right: Optional[int] = None       # right side reps for unilateral exercises
+    duration: Optional[int] = None         # duration in seconds for timed exercises
 
 
 class SetResponse(BaseModel):
@@ -77,6 +78,7 @@ class SetResponse(BaseModel):
     rpe: Optional[int]
     weight_right: Optional[float]
     reps_right: Optional[int]
+    duration: Optional[int]
 
     class Config:
         from_attributes = True
@@ -88,6 +90,7 @@ class SetUpdate(BaseModel):
     rpe: Optional[int] = None
     weight_right: Optional[float] = None
     reps_right: Optional[int] = None
+    duration: Optional[int] = None
 
 
 # --- Exercises ---
@@ -96,6 +99,7 @@ class ExerciseCreate(BaseModel):
     name: str
     sets: list[SetCreate]
     is_unilateral: bool = False
+    is_timed: bool = False
     attachment: Optional[str] = None
 
 
@@ -105,6 +109,7 @@ class ExerciseResponse(BaseModel):
     order_index: int
     sets: list[SetResponse]
     is_unilateral: bool
+    is_timed: bool = False
     attachment: Optional[str]
 
     class Config:
@@ -378,12 +383,14 @@ class TemplateResponse(BaseModel):
 class ExerciseAddRequest(BaseModel):
     name: str
     is_unilateral: bool = False
+    is_timed: bool = False
     attachment: Optional[str] = None
 
 
 class ExerciseUpdateRequest(BaseModel):
     name: Optional[str] = None
     is_unilateral: Optional[bool] = None
+    is_timed: Optional[bool] = None
     attachment: Optional[str] = None
 
 

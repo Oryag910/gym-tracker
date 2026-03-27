@@ -304,7 +304,7 @@ export default function TemplateFormPage() {
                           <input className={input} type="number" step="0.5" min="0"
                             value={s.target_weight}
                             onChange={e => updateSet(ei, si, 'target_weight', e.target.value)}
-                            placeholder="BW" />
+                            placeholder="Weight" />
                           {ex.sets.length > 1 ? (
                             <button type="button" onClick={() => removeSet(ei, si)} className="text-slate-600 hover:text-red-400 transition-colors text-lg leading-none">×</button>
                           ) : <span />}

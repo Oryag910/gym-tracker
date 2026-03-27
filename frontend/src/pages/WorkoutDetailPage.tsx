@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
@@ -8,7 +8,10 @@ import {
 import type { WorkoutDetail, ExerciseResponse, SetResponse } from '../api/workouts'
 import { lookupExercise } from '../api/exercises'
 import type { ExerciseLookup } from '../api/exercises'
+import { listExercises } from '../api/globalExercises'
+import type { GlobalExercise } from '../api/globalExercises'
 import MuscleMap from '../components/MuscleMap/MuscleMap'
+import ExercisePicker from '../components/ExercisePicker'
 import { card, input, skeleton, btnPrimary, btnDanger } from '../styles/tokens'
 import PageTransition from '../components/PageTransition'
 import { useAuth } from '../context/AuthContext'
@@ -16,7 +19,7 @@ import { toDisplayWeight, fromInputWeight, weightUnit } from '../utils/units'
 
 // ─── SetRow ──────────────────────────────────────────────────────────────────
 
-function SetRow({ set, workoutId, exerciseId, onUpdated, onDeleted, unitSystem, isUnilateral, isEditMode }: {
+function SetRow({ set, workoutId, exerciseId, onUpdated, onDeleted, unitSystem, isUnilateral, isTimed, isEditMode }: {
   set: SetResponse
   workoutId: number
   exerciseId: number
@@ -24,6 +27,7 @@ function SetRow({ set, workoutId, exerciseId, onUpdated, onDeleted, unitSystem, 
   onDeleted: (setId: number) => void
   unitSystem: string
   isUnilateral: boolean
+  isTimed: boolean
   isEditMode: boolean
 }) {
   const [editing, setEditing] = useState(false)
@@ -36,6 +40,7 @@ function SetRow({ set, workoutId, exerciseId, onUpdated, onDeleted, unitSystem, 
     set.weight_right != null ? toDisplayWeight(set.weight_right, unitSystem as any).toString() : ''
   )
   const [repsRight, setRepsRight] = useState(set.reps_right?.toString() ?? '')
+  const [duration, setDuration] = useState(set.duration?.toString() ?? '')
   const [saving, setSaving] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const wt = weightUnit(unitSystem as any)
@@ -44,10 +49,11 @@ function SetRow({ set, workoutId, exerciseId, onUpdated, onDeleted, unitSystem, 
     setSaving(true)
     await updateSet(workoutId, exerciseId, set.id, {
       weight: weight ? fromInputWeight(parseFloat(weight), unitSystem as any) : undefined,
-      reps: reps ? parseInt(reps) : undefined,
+      reps: !isTimed && reps ? parseInt(reps) : undefined,
       rpe: rpe ? parseInt(rpe) : undefined,
       weight_right: isUnilateral && weightRight ? fromInputWeight(parseFloat(weightRight), unitSystem as any) : undefined,
       reps_right: isUnilateral && repsRight ? parseInt(repsRight) : undefined,
+      duration: isTimed && duration ? parseInt(duration) : undefined,
     })
     setSaving(false)
     setEditing(false)
@@ -70,17 +76,23 @@ function SetRow({ set, workoutId, exerciseId, onUpdated, onDeleted, unitSystem, 
       <motion.div layout className="flex items-center gap-2 py-2 border-b border-slate-700/50 last:border-0">
         <span className="text-slate-500 text-sm w-8 text-center shrink-0">{set.set_number}</span>
         <div className="flex-1 text-sm text-slate-300">
-          {isUnilateral ? (
+          {isTimed ? (
+            <>
+              {set.duration != null ? `${set.duration}s` : '—'}
+              {set.weight != null && <span> · {toDisplayWeight(set.weight, unitSystem as any)} {wt}</span>}
+              {set.rpe != null && <span className="text-slate-500"> · RPE {set.rpe}</span>}
+            </>
+          ) : isUnilateral ? (
             <>
               <span className="text-blue-300 text-xs font-bold">L</span>{' '}
-              {set.weight != null ? `${toDisplayWeight(set.weight, unitSystem as any)} ${wt}` : 'BW'} · {set.reps ?? '—'} reps
+              {set.weight != null ? `${toDisplayWeight(set.weight, unitSystem as any)} ${wt}` : '—'} · {set.reps ?? '—'} reps
               {' / '}
               <span className="text-amber-300 text-xs font-bold">R</span>{' '}
-              {set.weight_right != null ? `${toDisplayWeight(set.weight_right, unitSystem as any)} ${wt}` : 'BW'} · {set.reps_right ?? '—'} reps
+              {set.weight_right != null ? `${toDisplayWeight(set.weight_right, unitSystem as any)} ${wt}` : '—'} · {set.reps_right ?? '—'} reps
             </>
           ) : (
             <>
-              {set.reps ?? '—'} reps · {set.weight != null ? `${toDisplayWeight(set.weight, unitSystem as any)} ${wt}` : 'BW'}
+              {set.reps ?? '—'} reps · {set.weight != null ? `${toDisplayWeight(set.weight, unitSystem as any)} ${wt}` : '—'}
               {set.rpe != null && <span className="text-slate-500"> · RPE {set.rpe}</span>}
             </>
           )}
@@ -139,10 +151,10 @@ function SetRow({ set, workoutId, exerciseId, onUpdated, onDeleted, unitSystem, 
             <span className="text-slate-500 text-sm w-8 text-center shrink-0">{set.set_number}</span>
             <div className="flex-1 min-w-0 text-sm text-slate-200">
               <span className="text-blue-300 text-xs font-bold">L</span>{' '}
-              {set.weight != null ? `${toDisplayWeight(set.weight, unitSystem as any)} ${wt}` : 'BW'} · {set.reps ?? '—'} reps
+              {set.weight != null ? `${toDisplayWeight(set.weight, unitSystem as any)} ${wt}` : '—'} · {set.reps ?? '—'} reps
               {' / '}
               <span className="text-amber-300 text-xs font-bold">R</span>{' '}
-              {set.weight_right != null ? `${toDisplayWeight(set.weight_right, unitSystem as any)} ${wt}` : 'BW'} · {set.reps_right ?? '—'} reps
+              {set.weight_right != null ? `${toDisplayWeight(set.weight_right, unitSystem as any)} ${wt}` : '—'} · {set.reps_right ?? '—'} reps
               {set.rpe != null && <div className="text-slate-500 text-xs mt-0.5">RPE {set.rpe}</div>}
             </div>
             <button onClick={() => setEditing(true)} className="text-slate-600 hover:text-blue-400 transition-colors text-xs shrink-0">
@@ -154,7 +166,7 @@ function SetRow({ set, workoutId, exerciseId, onUpdated, onDeleted, unitSystem, 
     )
   }
 
-  // Normal mode: standard set
+  // Normal mode: standard set (includes timed exercises)
   return (
     <motion.div
       layout
@@ -165,9 +177,16 @@ function SetRow({ set, workoutId, exerciseId, onUpdated, onDeleted, unitSystem, 
       <span className="text-slate-500 text-sm text-center">{set.set_number}</span>
       {editing ? (
         <>
-          <input value={reps} onChange={e => setReps(e.target.value)}
-            className="bg-slate-900 border border-slate-600 rounded-lg px-2 py-1.5 text-sm text-slate-100 focus:border-blue-400 focus:outline-none w-full"
-            placeholder="reps" autoFocus />
+          {isTimed ? (
+            <input value={duration} onChange={e => setDuration(e.target.value)}
+              type="number" min="0"
+              className="bg-slate-900 border border-slate-600 rounded-lg px-2 py-1.5 text-sm text-slate-100 focus:border-blue-400 focus:outline-none w-full"
+              placeholder="sec" autoFocus />
+          ) : (
+            <input value={reps} onChange={e => setReps(e.target.value)}
+              className="bg-slate-900 border border-slate-600 rounded-lg px-2 py-1.5 text-sm text-slate-100 focus:border-blue-400 focus:outline-none w-full"
+              placeholder="reps" autoFocus />
+          )}
           <input value={weight} onChange={e => setWeight(e.target.value)}
             className="bg-slate-900 border border-slate-600 rounded-lg px-2 py-1.5 text-sm text-slate-100 focus:border-blue-400 focus:outline-none w-full"
             placeholder={wt} />
@@ -184,9 +203,11 @@ function SetRow({ set, workoutId, exerciseId, onUpdated, onDeleted, unitSystem, 
         </>
       ) : (
         <>
-          <span className="text-slate-200 text-sm">{set.reps ?? '—'} reps</span>
           <span className="text-slate-200 text-sm">
-            {set.weight != null ? `${toDisplayWeight(set.weight, unitSystem as any)} ${wt}` : 'BW'}
+            {isTimed ? (set.duration != null ? `${set.duration}s` : '—') : `${set.reps ?? '—'} reps`}
+          </span>
+          <span className="text-slate-200 text-sm">
+            {set.weight != null ? `${toDisplayWeight(set.weight, unitSystem as any)} ${wt}` : '—'}
           </span>
           <span className="text-slate-500 text-xs">{set.rpe != null ? `RPE ${set.rpe}` : '—'}</span>
           <button onClick={() => setEditing(true)} className="text-slate-600 hover:text-blue-400 transition-colors text-xs">
@@ -230,7 +251,7 @@ function TechniquePanel({ description, category }: { description: string; catego
 
 // ─── ExerciseCard ─────────────────────────────────────────────────────────────
 
-function ExerciseCard({ exercise, workoutId, onUpdated, onSetAdded, onSetDeleted, onDeleted, unitSystem, isEditMode }: {
+function ExerciseCard({ exercise, workoutId, onUpdated, onSetAdded, onSetDeleted, onDeleted, unitSystem, isEditMode, library }: {
   exercise: ExerciseResponse
   workoutId: number
   onUpdated: () => void
@@ -239,6 +260,7 @@ function ExerciseCard({ exercise, workoutId, onUpdated, onSetAdded, onSetDeleted
   onDeleted: (exerciseId: number) => void
   unitSystem: string
   isEditMode: boolean
+  library: GlobalExercise[]
 }) {
   const [lookup, setLookup] = useState<ExerciseLookup | null>(null)
   const [showMuscles, setShowMuscles] = useState(false)
@@ -248,14 +270,16 @@ function ExerciseCard({ exercise, workoutId, onUpdated, onSetAdded, onSetDeleted
   const [editName, setEditName] = useState(exercise.name)
   const [editAttachment, setEditAttachment] = useState(exercise.attachment ?? '')
   const [isUnilateral, setIsUnilateral] = useState(exercise.is_unilateral)
+  const [isTimed, setIsTimed] = useState(exercise.is_timed)
   const [addingSet, setAddingSet] = useState(false)
   const [deletingEx, setDeletingEx] = useState(false)
 
-  const saveMeta = async (overrides: { name?: string; attachment?: string | null; is_unilateral?: boolean } = {}) => {
+  const saveMeta = async (overrides: { name?: string; attachment?: string | null; is_unilateral?: boolean; is_timed?: boolean } = {}) => {
     await updateExercise(workoutId, exercise.id, {
       name: overrides.name ?? editName,
       attachment: overrides.attachment !== undefined ? overrides.attachment : (editAttachment || null),
       is_unilateral: overrides.is_unilateral ?? isUnilateral,
+      is_timed: overrides.is_timed ?? isTimed,
     })
     onUpdated()
   }
@@ -271,6 +295,7 @@ function ExerciseCard({ exercise, workoutId, onUpdated, onSetAdded, onSetDeleted
         rpe: last?.rpe ?? null,
         weight_right: last?.weight_right ?? null,
         reps_right: last?.reps_right ?? null,
+        duration: last?.duration ?? null,
       })
       onSetAdded(exercise.id, res.data)
     } finally {
@@ -313,12 +338,17 @@ function ExerciseCard({ exercise, workoutId, onUpdated, onSetAdded, onSetDeleted
           )}
           <div className="flex-1 min-w-0">
             {isEditMode ? (
-              <input
-                className={`${input} text-sm font-semibold mb-1`}
+              <ExercisePicker
                 value={editName}
-                onChange={e => setEditName(e.target.value)}
-                onBlur={() => saveMeta()}
-                placeholder="Exercise name"
+                library={library}
+                className="mb-1"
+                onChange={(name) => {
+                  setEditName(name)
+                  // Save after a short delay so rapid typing doesn't spam the API.
+                  // We use onBlur-like saving: the ExercisePicker calls onChange on every
+                  // keystroke, but we only save when the user picks from the dropdown
+                  // (which calls onChange with the full libExercise object).
+                }}
               />
             ) : (
               <h3 className="font-semibold text-slate-100 capitalize">{exercise.name}</h3>
@@ -340,6 +370,21 @@ function ExerciseCard({ exercise, workoutId, onUpdated, onSetAdded, onSetDeleted
                 >
                   {isUnilateral ? 'Unilateral ✓' : 'Unilateral'}
                 </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const next = !isTimed
+                    setIsTimed(next)
+                    saveMeta({ is_timed: next })
+                  }}
+                  className={`text-xs px-2.5 py-1 rounded-lg border transition-colors ${
+                    isTimed
+                      ? 'bg-amber-500/20 border-amber-500/50 text-amber-300'
+                      : 'bg-slate-800 border-slate-700 text-slate-500'
+                  }`}
+                >
+                  {isTimed ? 'Timed ✓' : 'Timed'}
+                </button>
                 <input
                   className="bg-slate-900 border border-slate-600 rounded-lg px-2 py-1 text-xs text-slate-100 focus:border-blue-400 focus:outline-none w-32"
                   value={editAttachment}
@@ -347,6 +392,13 @@ function ExerciseCard({ exercise, workoutId, onUpdated, onSetAdded, onSetDeleted
                   onBlur={() => saveMeta()}
                   placeholder="Attachment..."
                 />
+                <button
+                  type="button"
+                  onClick={() => saveMeta({ name: editName })}
+                  className="text-xs px-2.5 py-1 rounded-lg bg-blue-500/20 border border-blue-500/50 text-blue-300 transition-colors"
+                >
+                  Save name
+                </button>
               </div>
             ) : (
               <div className="text-slate-500 text-xs mt-0.5">
@@ -389,7 +441,7 @@ function ExerciseCard({ exercise, workoutId, onUpdated, onSetAdded, onSetDeleted
         ) : (
           <div className="grid grid-cols-[32px_1fr_1fr_52px_auto] gap-3 text-xs text-slate-500 mb-1">
             <span className="text-center">Set</span>
-            <span>Reps</span>
+            <span>{exercise.is_timed ? 'Duration' : 'Reps'}</span>
             <span>Weight ({weightUnit(unitSystem as any)})</span>
             <span>RPE</span>
             <span />
@@ -408,6 +460,7 @@ function ExerciseCard({ exercise, workoutId, onUpdated, onSetAdded, onSetDeleted
           onDeleted={setId => onSetDeleted(exercise.id, setId)}
           unitSystem={unitSystem}
           isUnilateral={exercise.is_unilateral}
+          isTimed={exercise.is_timed}
           isEditMode={isEditMode}
         />
       ))}
@@ -434,19 +487,22 @@ export default function WorkoutDetailPage() {
   const [showDeleteModal, setShowDeleteModal] = useState(false)
   const [deleting, setDeleting] = useState(false)
 
+  // Library for ExercisePicker (loaded once, shared across all ExerciseCards)
+  const [library, setLibrary] = useState<GlobalExercise[]>([])
+
   // Edit mode state
   const [isEditing, setIsEditing] = useState(false)
   const [editName, setEditName] = useState('')
   const [editDate, setEditDate] = useState('')
   const [savingMeta, setSavingMeta] = useState(false)
 
-  // Add exercise state
+  // Add exercise state — uses ExercisePicker, so we store the chosen name
   const [newExName, setNewExName] = useState('')
   const [addingEx, setAddingEx] = useState(false)
-  const addExInputRef = useRef<HTMLInputElement>(null)
 
   const load = () => getWorkout(Number(id)).then(r => setWorkout(r.data))
   useEffect(() => { load() }, [id])
+  useEffect(() => { listExercises().then(r => setLibrary(r.data)) }, [])
 
   const startEditing = () => {
     if (!workout) return
@@ -479,7 +535,6 @@ export default function WorkoutDetailPage() {
       const res = await addExercise(workout.id, { name: newExName.trim() })
       setWorkout(prev => prev ? { ...prev, exercises: [...prev.exercises, res.data] } : prev)
       setNewExName('')
-      addExInputRef.current?.focus()
     } finally {
       setAddingEx(false)
     }
@@ -596,20 +651,20 @@ export default function WorkoutDetailPage() {
             onDeleted={handleExerciseDeleted}
             unitSystem={unitSystem}
             isEditMode={isEditing}
+            library={library}
           />
         ))}
 
-        {/* Add exercise (edit mode) */}
+        {/* Add exercise (edit mode) — uses library dropdown so users can't type arbitrary names */}
         {isEditing && (
-          <div className={`${card} flex gap-2`}>
-            <input
-              ref={addExInputRef}
-              className={`${input} flex-1`}
-              value={newExName}
-              onChange={e => setNewExName(e.target.value)}
-              onKeyDown={e => e.key === 'Enter' && handleAddExercise()}
-              placeholder="New exercise name..."
-            />
+          <div className={`${card} flex gap-2 items-center`}>
+            <div className="flex-1 relative">
+              <ExercisePicker
+                value={newExName}
+                library={library}
+                onChange={(name) => setNewExName(name)}
+              />
+            </div>
             <button onClick={handleAddExercise} disabled={addingEx || !newExName.trim()} className={`${btnPrimary} px-4 shrink-0`}>
               {addingEx ? '...' : 'Add'}
             </button>

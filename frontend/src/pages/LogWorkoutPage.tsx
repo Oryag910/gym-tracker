@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useBlocker } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { createWorkout } from '../api/workouts'
 import { listTemplates } from '../api/templates'
@@ -55,7 +55,7 @@ function LogTechniquePanel({ description, category }: { description: string; cat
   )
 }
 
-interface SetForm { weight: string; reps: string; rpe: string; weight_right: string; reps_right: string }
+interface SetForm { weight: string; reps: string; rpe: string; weight_right: string; reps_right: string; duration: string }
 interface ExerciseForm {
   name: string
   sets: SetForm[]
@@ -64,15 +64,16 @@ interface ExerciseForm {
   filter: string
   showPicker: boolean
   is_unilateral: boolean
+  is_timed: boolean
   attachment: string
 }
 
 const today = () => new Date().toISOString().split('T')[0]
-const emptySet = (): SetForm => ({ weight: '', reps: '', rpe: '', weight_right: '', reps_right: '' })
+const emptySet = (): SetForm => ({ weight: '', reps: '', rpe: '', weight_right: '', reps_right: '', duration: '' })
 const emptyExercise = (): ExerciseForm => ({
   name: '', sets: [emptySet()],
   lookup: null, showMuscles: false, filter: '', showPicker: false,
-  is_unilateral: false, attachment: '',
+  is_unilateral: false, is_timed: false, attachment: '',
 })
 
 function libraryToLookup(ex: GlobalExercise): ExerciseLookup {
@@ -104,10 +105,77 @@ export default function LogWorkoutPage() {
   const [library, setLibrary] = useState<GlobalExercise[]>([])
   const pickerRefs = useRef<(HTMLDivElement | null)[]>([])
 
+  // State for the draft restore banner
+  const [showDraftBanner, setShowDraftBanner] = useState(false)
+  // State for the in-app navigation guard modal
+  const [showNavModal, setShowNavModal] = useState(false)
+
   useEffect(() => {
     listExercises().then(r => setLibrary(r.data)).catch(() => {})
     listTemplates().then(r => { setTemplates(r.data); setLoadingTemplates(false) }).catch(() => setLoadingTemplates(false))
+    // On mount: check if there's a saved draft to restore
+    if (localStorage.getItem('workout_draft')) setShowDraftBanner(true)
   }, [])
+
+  // Auto-save draft to localStorage whenever the form changes.
+  // Using a ref-based debounce so we don't write on every single keystroke.
+  const draftTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  useEffect(() => {
+    // Only save a draft if the user is in free-log mode with some data
+    if (mode !== 'free') return
+    if (draftTimerRef.current) clearTimeout(draftTimerRef.current)
+    draftTimerRef.current = setTimeout(() => {
+      if (exercises.some(ex => ex.name) || name) {
+        localStorage.setItem('workout_draft', JSON.stringify({ name, date, exercises }))
+      }
+    }, 500)
+    return () => { if (draftTimerRef.current) clearTimeout(draftTimerRef.current) }
+  }, [exercises, name, date, mode])
+
+  // Warn if user tries to close/refresh the tab while mid-workout
+  useEffect(() => {
+    const hasData = exercises.some(ex => ex.name) && !saved
+    if (!hasData) return
+    const handler = (e: BeforeUnloadEvent) => {
+      e.preventDefault()
+      e.returnValue = '' // Required for Chrome to show the dialog
+    }
+    window.addEventListener('beforeunload', handler)
+    return () => window.removeEventListener('beforeunload', handler)
+  }, [exercises, saved])
+
+  // Block in-app navigation while mid-workout (React Router v7 useBlocker)
+  const blocker = useBlocker(
+    ({ currentLocation, nextLocation }) =>
+      mode === 'free' &&
+      exercises.some(ex => ex.name) &&
+      !saved &&
+      currentLocation.pathname !== nextLocation.pathname
+  )
+  // When blocker fires, show our custom modal instead of the default browser prompt
+  useEffect(() => {
+    if (blocker.state === 'blocked') setShowNavModal(true)
+    else setShowNavModal(false)
+  }, [blocker.state])
+
+  const restoreDraft = () => {
+    try {
+      const raw = localStorage.getItem('workout_draft')
+      if (!raw) return
+      const draft = JSON.parse(raw)
+      if (draft.name) setName(draft.name)
+      if (draft.date) setDate(draft.date)
+      if (draft.exercises) setExercises(draft.exercises)
+      setMode('free')
+    } catch {}
+    localStorage.removeItem('workout_draft')
+    setShowDraftBanner(false)
+  }
+
+  const discardDraft = () => {
+    localStorage.removeItem('workout_draft')
+    setShowDraftBanner(false)
+  }
 
   const updateExercise = (i: number, patch: Partial<ExerciseForm>) =>
     setExercises(prev => prev.map((ex, idx) => idx === i ? { ...ex, ...patch } : ex))
@@ -152,18 +220,22 @@ export default function LogWorkoutPage() {
         exercises: exercises.map(ex => ({
           name: ex.name,
           is_unilateral: ex.is_unilateral,
+          is_timed: ex.is_timed,
           attachment: ex.attachment || null,
           sets: ex.sets.map(s => ({
             weight: s.weight ? fromInputWeight(parseFloat(s.weight), units.weight) : null,
-            reps: s.reps ? parseInt(s.reps) : null,
+            reps: !ex.is_timed && s.reps ? parseInt(s.reps) : null,
             rpe: s.rpe ? parseInt(s.rpe) : null,
             weight_right: ex.is_unilateral && s.weight_right
               ? fromInputWeight(parseFloat(s.weight_right), units.weight) : null,
             reps_right: ex.is_unilateral && s.reps_right ? parseInt(s.reps_right) : null,
+            duration: ex.is_timed && s.duration ? parseInt(s.duration) : null,
           })),
         })),
       }
       const res = await createWorkout(payload)
+      // Clear any saved draft now that the workout is successfully submitted
+      localStorage.removeItem('workout_draft')
       setSaved(true)
       setTimeout(() => navigate(`/workouts/${res.data.id}`), 600)
     } catch (err: any) {
@@ -178,6 +250,17 @@ export default function LogWorkoutPage() {
       <PageTransition>
         <div className="space-y-6 max-w-2xl mx-auto">
           <h1 className="text-2xl font-black text-slate-100 tracking-tight">Log Workout</h1>
+
+          {/* Draft restore banner */}
+          {showDraftBanner && (
+            <div className="bg-amber-500/10 border border-amber-500/30 rounded-xl px-4 py-3 flex items-center justify-between gap-3">
+              <span className="text-sm text-amber-200">You have an unsaved workout draft.</span>
+              <div className="flex gap-2 shrink-0">
+                <button onClick={restoreDraft} className="text-xs font-semibold text-amber-300 hover:text-amber-100 transition-colors">Restore</button>
+                <button onClick={discardDraft} className="text-xs text-slate-500 hover:text-slate-300 transition-colors">Discard</button>
+              </div>
+            </div>
+          )}
 
           {/* Template list */}
           {loadingTemplates ? (
@@ -242,6 +325,40 @@ export default function LogWorkoutPage() {
   return (
     <PageTransition>
       <div className="space-y-6 max-w-2xl mx-auto">
+        {/* In-app navigation guard modal */}
+        <AnimatePresence>
+          {showNavModal && blocker.state === 'blocked' && (
+            <motion.div
+              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center z-50 px-4"
+            >
+              <motion.div
+                initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }}
+                className="bg-slate-900 border border-slate-700 rounded-2xl p-6 w-full max-w-sm"
+              >
+                <h2 className="text-lg font-bold text-slate-100 mb-2">Leave workout?</h2>
+                <p className="text-slate-400 text-sm mb-6">
+                  Your draft has been saved. You can restore it when you come back to Log Workout.
+                </p>
+                <div className="flex gap-3">
+                  <button
+                    onClick={() => blocker.proceed?.()}
+                    className="flex-1 bg-slate-700 text-slate-200 font-medium rounded-xl py-2.5 hover:bg-slate-600 transition-all"
+                  >
+                    Leave
+                  </button>
+                  <button
+                    onClick={() => blocker.reset?.()}
+                    className="flex-1 bg-blue-500 text-slate-950 font-bold rounded-xl py-2.5 hover:bg-blue-400 active:scale-95 transition-all"
+                  >
+                    Stay
+                  </button>
+                </div>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
         <div className="flex items-center gap-3">
           <button type="button" onClick={() => setMode('choose')} className="text-slate-500 hover:text-slate-300 transition-colors">
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -345,11 +462,11 @@ export default function LogWorkoutPage() {
                     )}
                   </div>
 
-                  {/* Attachment + unilateral toggle — shown once an exercise is selected */}
+                  {/* Attachment + unilateral + timed toggles — shown once an exercise is selected */}
                   {ex.name && (
-                    <div className="flex items-center gap-3 mb-4">
+                    <div className="flex items-center gap-2 flex-wrap mb-4">
                       <input
-                        className={`${input} flex-1 text-sm`}
+                        className={`${input} flex-1 min-w-0 text-sm`}
                         value={ex.attachment}
                         onChange={e => updateExercise(ei, { attachment: e.target.value })}
                         placeholder="Attachment (e.g. D-handle, cuff, rope...)"
@@ -364,6 +481,18 @@ export default function LogWorkoutPage() {
                         }`}
                       >
                         Unilateral
+                      </button>
+                      {/* Time toggle: switches between Reps mode and Duration mode */}
+                      <button
+                        type="button"
+                        onClick={() => updateExercise(ei, { is_timed: !ex.is_timed })}
+                        className={`shrink-0 px-3 py-2 rounded-xl text-xs font-medium border transition-colors ${
+                          ex.is_timed
+                            ? 'bg-amber-500/20 border-amber-400/60 text-amber-300'
+                            : 'border-slate-600 text-slate-500 hover:border-slate-500'
+                        }`}
+                      >
+                        {ex.is_timed ? 'Timed ✓' : 'Timed'}
                       </button>
                     </div>
                   )}
@@ -418,6 +547,10 @@ export default function LogWorkoutPage() {
                       <div className="grid grid-cols-[24px_28px_1fr_1fr] gap-2 text-xs text-slate-500 px-1">
                         <span>Set</span><span>Side</span><span>Reps</span><span>Weight ({wt})</span>
                       </div>
+                    ) : ex.is_timed ? (
+                      <div className="grid grid-cols-[24px_1fr_1fr_52px_24px] gap-2 text-xs text-slate-500 px-1">
+                        <span>Set</span><span>Duration (sec)</span><span>Weight ({wt})</span><span>RPE</span><span />
+                      </div>
                     ) : (
                       <div className="grid grid-cols-[24px_1fr_1fr_52px_24px] gap-2 text-xs text-slate-500 px-1">
                         <span>Set</span><span>Reps</span><span>Weight ({wt})</span><span>RPE</span><span />
@@ -444,14 +577,14 @@ export default function LogWorkoutPage() {
                                   type="number" min="0"
                                   value={s.reps}
                                   onChange={e => updateSet(ei, si, 'reps', e.target.value)}
-                                  placeholder="reps"
+                                  placeholder="Reps"
                                 />
                                 <input
                                   className={input}
                                   type="number" step="0.5" min="0"
                                   value={s.weight}
                                   onChange={e => updateSet(ei, si, 'weight', e.target.value)}
-                                  placeholder="BW"
+                                  placeholder="Weight"
                                 />
                               </div>
                               {/* R row */}
@@ -463,14 +596,14 @@ export default function LogWorkoutPage() {
                                   type="number" min="0"
                                   value={s.reps_right}
                                   onChange={e => updateSet(ei, si, 'reps_right', e.target.value)}
-                                  placeholder="reps"
+                                  placeholder="Reps"
                                 />
                                 <input
                                   className={input}
                                   type="number" step="0.5" min="0"
                                   value={s.weight_right}
                                   onChange={e => updateSet(ei, si, 'weight_right', e.target.value)}
-                                  placeholder="BW"
+                                  placeholder="Weight"
                                 />
                                 <input
                                   className={input}
@@ -484,6 +617,35 @@ export default function LogWorkoutPage() {
                                 ) : <span />}
                               </div>
                             </div>
+                          ) : ex.is_timed ? (
+                            /* Timed exercise: duration instead of reps */
+                            <div className="grid grid-cols-[24px_1fr_1fr_52px_24px] gap-2 items-center">
+                              <span className="text-slate-500 text-sm text-center">{si + 1}</span>
+                              <input
+                                className={input}
+                                type="number" min="0"
+                                value={s.duration}
+                                onChange={e => updateSet(ei, si, 'duration', e.target.value)}
+                                placeholder="sec"
+                              />
+                              <input
+                                className={input}
+                                type="number" step="0.5" min="0"
+                                value={s.weight}
+                                onChange={e => updateSet(ei, si, 'weight', e.target.value)}
+                                placeholder="Weight"
+                              />
+                              <input
+                                className={input}
+                                type="number" min="1" max="10"
+                                value={s.rpe}
+                                onChange={e => updateSet(ei, si, 'rpe', e.target.value)}
+                                placeholder="—"
+                              />
+                              {ex.sets.length > 1 ? (
+                                <button type="button" onClick={() => removeSet(ei, si)} className="text-slate-600 hover:text-red-400 transition-colors text-lg leading-none">×</button>
+                              ) : <span />}
+                            </div>
                           ) : (
                             /* Standard bilateral row */
                             <div className="grid grid-cols-[24px_1fr_1fr_52px_24px] gap-2 items-center">
@@ -493,14 +655,14 @@ export default function LogWorkoutPage() {
                                 type="number" min="0"
                                 value={s.reps}
                                 onChange={e => updateSet(ei, si, 'reps', e.target.value)}
-                                placeholder="reps"
+                                placeholder="Reps"
                               />
                               <input
                                 className={input}
                                 type="number" step="0.5" min="0"
                                 value={s.weight}
                                 onChange={e => updateSet(ei, si, 'weight', e.target.value)}
-                                placeholder="BW"
+                                placeholder="Weight"
                               />
                               <input
                                 className={input}

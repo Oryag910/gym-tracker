@@ -106,6 +106,16 @@ export default function LogWorkoutPage() {
   // Initialized directly from localStorage so the resume card shows immediately
   // on the first render — no useEffect delay.
   const [showResumeCard, setShowResumeCard] = useState(() => !!localStorage.getItem('workout_draft'))
+  const [guidedDraft, setGuidedDraft] = useState<{
+    templateId: number; workoutName: string; completedSets: { length: number }; savedPhase: string
+  } | null>(() => {
+    try {
+      const raw = localStorage.getItem('guided_workout_draft')
+      if (!raw) return null
+      const d = JSON.parse(raw)
+      return d.completedSets?.length > 0 ? d : null
+    } catch { return null }
+  })
   const pickerRefs = useRef<(HTMLDivElement | null)[]>([])
 
   useEffect(() => {
@@ -278,7 +288,38 @@ export default function LogWorkoutPage() {
         <div className="space-y-6 max-w-2xl mx-auto">
           <h1 className="text-2xl font-black text-slate-100 tracking-tight">Log Workout</h1>
 
-          {/* Resume card — shown when a draft exists in localStorage */}
+          {/* Guided workout resume card — shown when a guided draft exists in localStorage */}
+          {guidedDraft && (
+            <div className={`${card} border-blue-500/40 bg-blue-500/5`}>
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="text-sm font-semibold text-blue-300">Resume in-progress workout</p>
+                  <p className="text-xs text-slate-400 mt-0.5 truncate">
+                    {guidedDraft.workoutName} · {guidedDraft.completedSets.length} set{guidedDraft.completedSets.length !== 1 ? 's' : ''} logged
+                    {guidedDraft.savedPhase === 'summary' ? ' — ready to save' : ''}
+                  </p>
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => navigate(`/workout/guided/${guidedDraft.templateId}`, { state: { autoResume: true } })}
+                    className={btnPrimary}
+                  >
+                    Resume
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => { localStorage.removeItem('guided_workout_draft'); setGuidedDraft(null) }}
+                    className="text-xs text-slate-500 hover:text-red-400 transition-colors"
+                  >
+                    Discard
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Free-log resume card — shown when a free-log draft exists in localStorage */}
           {showResumeCard && draftNames.length > 0 && (
             <div className={`${card} border-blue-500/40 bg-blue-500/5`}>
               <div className="flex items-start justify-between gap-3">

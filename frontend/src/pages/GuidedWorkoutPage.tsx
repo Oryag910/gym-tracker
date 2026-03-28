@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { useNavigate, useParams, useLocation } from 'react-router-dom'
 import { getTemplate } from '../api/templates'
 import type { TemplateDetail, TemplateExerciseResponse } from '../api/templates'
 import { createWorkout } from '../api/workouts'
@@ -160,6 +160,7 @@ function RestTimer({ phase, onDone, onSkip, onAdd }: {
 export default function GuidedWorkoutPage() {
   const { templateId } = useParams<{ templateId: string }>()
   const navigate = useNavigate()
+  const location = useLocation()
   const { units } = useAuth()
   const wt = weightUnit(units.weight)
 
@@ -193,7 +194,33 @@ export default function GuidedWorkoutPage() {
         if (raw) {
           const draft: GuidedDraft = JSON.parse(raw)
           if (draft.templateId === Number(templateId) && draft.completedSets.length > 0) {
-            setSavedDraft(draft)
+            if (location.state?.autoResume) {
+              // Came from the /log resume card — skip the ready screen entirely
+              localStorage.removeItem(GUIDED_DRAFT_KEY)
+              setSkippedQueue(draft.skippedQueue ?? [])
+              if (draft.savedPhase === 'summary') {
+                setPhase({
+                  kind: 'summary', template: draft.template,
+                  completedSets: draft.completedSets,
+                  workoutName: draft.workoutName, date: draft.date,
+                })
+              } else {
+                // goToActive isn't defined yet here, so inline its logic
+                const ex = draft.template.exercises[draft.exerciseIndex]
+                const s = ex?.sets[draft.setIndex]
+                setPhase({
+                  kind: 'active', template: draft.template,
+                  exerciseIndex: draft.exerciseIndex, setIndex: draft.setIndex,
+                  completedSets: draft.completedSets,
+                  actualWeight: s?.target_weight != null
+                    ? String(toDisplayWeight(s.target_weight, units.weight)) : '',
+                  actualReps: s?.target_reps != null ? String(s.target_reps) : '',
+                  actualRpe: '', actualWeightRight: '', actualRepsRight: '',
+                })
+              }
+              return // don't fall through to setPhase({ kind: 'ready' })
+            }
+            setSavedDraft(draft) // no autoResume — show resume card on the ready screen
           }
         }
       } catch {

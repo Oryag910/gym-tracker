@@ -11,6 +11,20 @@ import PageTransition from '../components/PageTransition'
 
 const today = () => new Date().toISOString().split('T')[0]
 
+const GUIDED_DRAFT_KEY = 'guided_workout_draft'
+
+interface GuidedDraft {
+  templateId: number
+  template: TemplateDetail
+  exerciseIndex: number
+  setIndex: number
+  completedSets: CompletedSet[]
+  skippedQueue: TemplateExerciseResponse[]
+  savedPhase: 'active' | 'summary'
+  workoutName: string
+  date: string
+}
+
 interface CompletedSet {
   exerciseIndex: number
   exerciseName: string
@@ -154,9 +168,16 @@ export default function GuidedWorkoutPage() {
   const startTimeRef = useRef<number>(0)
   const [savingError, setSavingError] = useState('')
   const [showExitModal, setShowExitModal] = useState(false)
+  const [savedDraft, setSavedDraft] = useState<GuidedDraft | null>(null)
+
+  // Always-current refs for unmount cleanup — same pattern as LogWorkoutPage's draftRef
+  const phaseRef = useRef<Phase>(phase)
+  phaseRef.current = phase
 
   // Exercises parked for later — shown as "do one now?" prompts
   const [skippedQueue, setSkippedQueue] = useState<TemplateExerciseResponse[]>([])
+  const skippedQueueRef = useRef(skippedQueue)
+  skippedQueueRef.current = skippedQueue
 
   // Add-exercise modal state
   const [showAddModal, setShowAddModal] = useState(false)
@@ -165,9 +186,57 @@ export default function GuidedWorkoutPage() {
   const [library, setLibrary] = useState<GlobalExercise[]>([])
 
   useEffect(() => {
-    getTemplate(Number(templateId)).then(r => setPhase({ kind: 'ready', template: r.data }))
+    getTemplate(Number(templateId)).then(r => {
+      // Check for a saved draft matching this template before showing the ready screen
+      try {
+        const raw = localStorage.getItem(GUIDED_DRAFT_KEY)
+        if (raw) {
+          const draft: GuidedDraft = JSON.parse(raw)
+          if (draft.templateId === Number(templateId) && draft.completedSets.length > 0) {
+            setSavedDraft(draft)
+          }
+        }
+      } catch {
+        localStorage.removeItem(GUIDED_DRAFT_KEY)
+      }
+      setPhase({ kind: 'ready', template: r.data })
+    })
     listExercises().then(r => setLibrary(r.data)).catch(() => {})
   }, [templateId])
+
+  // Save draft to localStorage on unmount — fires when user navigates away mid-workout.
+  // Uses refs so the cleanup always reads the latest state even though deps is empty.
+  useEffect(() => {
+    return () => {
+      const p = phaseRef.current
+      const sq = skippedQueueRef.current
+      const tid = Number(templateId)
+
+      if (p.kind === 'active' && p.completedSets.length > 0) {
+        localStorage.setItem(GUIDED_DRAFT_KEY, JSON.stringify({
+          templateId: tid, template: p.template,
+          exerciseIndex: p.exerciseIndex, setIndex: p.setIndex,
+          completedSets: p.completedSets, skippedQueue: sq,
+          savedPhase: 'active', workoutName: p.template.name, date: today(),
+        }))
+      } else if (p.kind === 'resting' && p.completedSets.length > 0) {
+        // The rest timer can't be resumed — restore to the next active position instead
+        localStorage.setItem(GUIDED_DRAFT_KEY, JSON.stringify({
+          templateId: tid, template: p.template,
+          exerciseIndex: p.nextExerciseIndex, setIndex: p.nextSetIndex,
+          completedSets: p.completedSets, skippedQueue: sq,
+          savedPhase: 'active', workoutName: p.template.name, date: today(),
+        }))
+      } else if (p.kind === 'summary' && p.completedSets.length > 0) {
+        localStorage.setItem(GUIDED_DRAFT_KEY, JSON.stringify({
+          templateId: tid, template: p.template,
+          exerciseIndex: p.template.exercises.length - 1, setIndex: 0,
+          completedSets: p.completedSets, skippedQueue: sq,
+          savedPhase: 'summary', workoutName: p.workoutName, date: p.date,
+        }))
+      }
+    }
+  }, []) // empty deps — only the cleanup runs, on unmount
 
   const beginWorkout = (template: TemplateDetail) => {
     if (template.exercises.length === 0) return
@@ -191,6 +260,21 @@ export default function GuidedWorkoutPage() {
       actualReps: s?.target_reps != null ? String(s.target_reps) : '',
       actualRpe: '', actualWeightRight: '', actualRepsRight: '',
     })
+  }
+
+  const resumeDraft = (draft: GuidedDraft) => {
+    setSavedDraft(null)
+    localStorage.removeItem(GUIDED_DRAFT_KEY)
+    setSkippedQueue(draft.skippedQueue ?? [])
+    if (draft.savedPhase === 'summary') {
+      setPhase({
+        kind: 'summary', template: draft.template,
+        completedSets: draft.completedSets,
+        workoutName: draft.workoutName, date: draft.date,
+      })
+    } else {
+      goToActive(draft.template, draft.exerciseIndex, draft.setIndex, draft.completedSets)
+    }
   }
 
   const logSet = (p: Extract<Phase, { kind: 'active' }>) => {
@@ -331,7 +415,11 @@ export default function GuidedWorkoutPage() {
     setPhase({ kind: 'summary', template, completedSets, workoutName: template.name, date: today() })
   }
 
-  const exitDiscard = () => { setShowExitModal(false); navigate(-1) }
+  const exitDiscard = () => {
+    setShowExitModal(false)
+    localStorage.removeItem(GUIDED_DRAFT_KEY)
+    navigate(-1)
+  }
 
   const saveWorkout = async (p: Extract<Phase, { kind: 'summary' }>) => {
     setPhase({ kind: 'saving' })
@@ -353,6 +441,7 @@ export default function GuidedWorkoutPage() {
         })),
       }))
       const res = await createWorkout({ name: p.workoutName, date: p.date, exercises })
+      localStorage.removeItem(GUIDED_DRAFT_KEY)
       navigate(`/workouts/${res.data.id}`)
     } catch (err: any) {
       setSavingError(err.response?.data?.detail || 'Failed to save workout')
@@ -385,6 +474,32 @@ export default function GuidedWorkoutPage() {
             <h1 className="text-2xl font-black text-slate-100 tracking-tight">{template.name}</h1>
             {template.description && <p className="text-slate-400 text-sm mt-1">{template.description}</p>}
           </div>
+
+          {/* Resume card — shown when a draft for this template exists in localStorage */}
+          {savedDraft && (
+            <div className={`${card} border-blue-500/40 bg-blue-500/5`}>
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="text-sm font-semibold text-blue-300">Resume in-progress workout</p>
+                  <p className="text-xs text-slate-400 mt-0.5">
+                    {savedDraft.completedSets.length} set{savedDraft.completedSets.length !== 1 ? 's' : ''} already logged
+                    {savedDraft.savedPhase === 'summary' ? ' — ready to save' : ''}
+                  </p>
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
+                  <button onClick={() => resumeDraft(savedDraft)} className={btnPrimary}>
+                    Resume
+                  </button>
+                  <button
+                    onClick={() => { setSavedDraft(null); localStorage.removeItem(GUIDED_DRAFT_KEY) }}
+                    className="text-xs text-slate-500 hover:text-red-400 transition-colors"
+                  >
+                    Discard
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
 
           <div className={card}>
             <h2 className="font-semibold text-slate-200 mb-3">Workout Overview</h2>
@@ -808,7 +923,7 @@ export default function GuidedWorkoutPage() {
             <button onClick={() => saveWorkout(phase)} className={`${btnPrimary} w-full py-3`}>
               Save Workout
             </button>
-            <button onClick={() => navigate('/templates')}
+            <button onClick={() => { localStorage.removeItem(GUIDED_DRAFT_KEY); navigate('/templates') }}
               className="w-full text-slate-500 hover:text-slate-300 text-sm mt-3 transition-colors">
               Discard
             </button>

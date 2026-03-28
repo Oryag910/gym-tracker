@@ -103,6 +103,9 @@ export default function LogWorkoutPage() {
   const [saved, setSaved] = useState(false)
   const [error, setError] = useState('')
   const [library, setLibrary] = useState<GlobalExercise[]>([])
+  // Initialized directly from localStorage so the resume card shows immediately
+  // on the first render — no useEffect delay.
+  const [showResumeCard, setShowResumeCard] = useState(() => !!localStorage.getItem('workout_draft'))
   const pickerRefs = useRef<(HTMLDivElement | null)[]>([])
 
   useEffect(() => {
@@ -261,10 +264,54 @@ export default function LogWorkoutPage() {
 
   // ── Template picker screen ─────────────────────────────────────────────────
   if (mode === 'choose') {
+    // Read the draft synchronously so the resume card shows on the very first render.
+    const savedDraft = (() => {
+      try { return JSON.parse(localStorage.getItem('workout_draft') ?? 'null') }
+      catch { return null }
+    })()
+    const draftNames: string[] = savedDraft?.exercises
+      ?.filter((ex: ExerciseForm) => ex.name)
+      .map((ex: ExerciseForm) => ex.name as string) ?? []
+
     return (
       <PageTransition>
         <div className="space-y-6 max-w-2xl mx-auto">
           <h1 className="text-2xl font-black text-slate-100 tracking-tight">Log Workout</h1>
+
+          {/* Resume card — shown when a draft exists in localStorage */}
+          {showResumeCard && draftNames.length > 0 && (
+            <div className={`${card} border-blue-500/40 bg-blue-500/5`}>
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="text-sm font-semibold text-blue-300">Resume your workout</p>
+                  <p className="text-xs text-slate-400 mt-0.5 truncate">{draftNames.join(', ')}</p>
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const draft = JSON.parse(localStorage.getItem('workout_draft')!)
+                      if (draft.name) setName(draft.name)
+                      if (draft.date) setDate(draft.date)
+                      if (draft.exercises?.length) setExercises(draft.exercises)
+                      localStorage.removeItem('workout_draft')
+                      setMode('free')
+                    }}
+                    className={btnPrimary}
+                  >
+                    Resume
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => { localStorage.removeItem('workout_draft'); setShowResumeCard(false) }}
+                    className="text-xs text-slate-500 hover:text-red-400 transition-colors"
+                  >
+                    Discard
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Template list */}
           {loadingTemplates ? (

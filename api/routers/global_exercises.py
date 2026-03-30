@@ -135,6 +135,23 @@ def delete_exercise(
     db.commit()
 
 
+def _names_similar(our_name: str, wger_name: str) -> bool:
+    """Return True if the wger result name is close enough to our exercise name.
+    We normalise hyphens and check that at least half of the shorter name's
+    words appear in the other name.  This prevents wger's fuzzy search from
+    matching a completely unrelated exercise (e.g. "Ab Wheel Rollout" →
+    "Barbell Curl").
+    """
+    def words(s: str) -> set[str]:
+        return set(s.lower().replace("-", " ").split())
+
+    our = words(our_name)
+    theirs = words(wger_name)
+    common = our & theirs
+    shorter = min(len(our), len(theirs))
+    return shorter > 0 and len(common) / shorter >= 0.5
+
+
 @router.post("/fill-images")
 async def fill_images(
     admin: User = Depends(_require_admin),
@@ -164,7 +181,14 @@ async def fill_images(
                     skipped += 1
                     continue
 
-                base_id = suggestions[0].get("data", {}).get("base_id")
+                # Only use the result if its name is actually similar to ours
+                match = suggestions[0]
+                matched_name = match.get("value", "")
+                if not _names_similar(ex.name, matched_name):
+                    skipped += 1
+                    continue
+
+                base_id = match.get("data", {}).get("base_id")
                 if not base_id:
                     skipped += 1
                     continue

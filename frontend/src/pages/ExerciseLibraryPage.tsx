@@ -7,6 +7,7 @@ import {
   deleteExercise,
   searchExerciseDB,
   importFromWger,
+  fillImages,
   type GlobalExercise,
   type GlobalExercisePayload,
   type ExerciseDBResult,
@@ -219,14 +220,6 @@ function ExerciseCard({ exercise, isAdmin, onEdit, onDelete }: {
     <div className={card}>
       <div className="flex items-start justify-between gap-3">
         <div className="flex items-start gap-3 flex-1 min-w-0">
-          {exercise.image_url && (
-            <img
-              src={exercise.image_url}
-              alt={exercise.name}
-              className="w-14 h-14 object-cover rounded-lg bg-slate-700 shrink-0"
-              onError={e => { (e.target as HTMLImageElement).style.display = 'none' }}
-            />
-          )}
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
               <h3 className="font-semibold text-slate-100">{exercise.name}</h3>
@@ -262,9 +255,21 @@ function ExerciseCard({ exercise, isAdmin, onEdit, onDelete }: {
       <AnimatePresence>
         {expanded && (
           <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className="overflow-hidden mt-3 border-t border-slate-700/50 pt-3 space-y-3">
-            {hasMuscles && (
-              <MuscleMap primary={exercise.muscles_primary} secondary={exercise.muscles_secondary} primaryIds={exercise.muscles_primary_ids} secondaryIds={exercise.muscles_secondary_ids} />
-            )}
+            <div className="flex gap-4 items-start">
+              {exercise.image_url && (
+                <img
+                  src={exercise.image_url}
+                  alt={exercise.name}
+                  className="w-28 h-28 object-cover rounded-xl bg-slate-700 shrink-0"
+                  onError={e => { (e.target as HTMLImageElement).style.display = 'none' }}
+                />
+              )}
+              {hasMuscles && (
+                <div className="flex-1">
+                  <MuscleMap primary={exercise.muscles_primary} secondary={exercise.muscles_secondary} primaryIds={exercise.muscles_primary_ids} secondaryIds={exercise.muscles_secondary_ids} />
+                </div>
+              )}
+            </div>
             {exercise.description && (
               <p className="text-xs text-slate-400 whitespace-pre-wrap">{exercise.description}</p>
             )}
@@ -310,6 +315,8 @@ export default function ExerciseLibraryPage() {
   const [error, setError] = useState('')
   const [wgerImporting, setWgerImporting] = useState(false)
   const [wgerResult, setWgerResult] = useState<{ imported: number; skipped: number } | null>(null)
+  const [fillingImages, setFillingImages] = useState(false)
+  const [fillResult, setFillResult] = useState<{ filled: number; skipped: number } | null>(null)
 
   const load = async () => {
     try {
@@ -380,6 +387,25 @@ export default function ExerciseLibraryPage() {
                 className="text-xs px-3 py-2 rounded-lg border border-slate-600 text-slate-400 hover:text-slate-200 hover:border-slate-500 transition-colors disabled:opacity-50">
                 {wgerImporting ? 'Importing...' : 'Import from wger'}
               </button>
+              <button
+                onClick={async () => {
+                  setFillingImages(true)
+                  setFillResult(null)
+                  try {
+                    const res = await fillImages()
+                    setFillResult(res.data)
+                    await load()
+                  } catch {
+                    setError('Auto-fill images failed')
+                  } finally {
+                    setFillingImages(false)
+                  }
+                }}
+                disabled={fillingImages}
+                className="text-xs px-3 py-2 rounded-lg border border-slate-600 text-slate-400 hover:text-slate-200 hover:border-slate-500 transition-colors disabled:opacity-50"
+              >
+                {fillingImages ? 'Filling...' : 'Auto-fill images'}
+              </button>
               <button onClick={() => { setMode('create'); setError('') }} className={`${btnPrimary} px-4 py-2 text-sm`}>
                 + Add Exercise
               </button>
@@ -389,6 +415,11 @@ export default function ExerciseLibraryPage() {
         {wgerResult && (
           <p className="text-emerald-400 text-sm">
             Imported {wgerResult.imported} exercises, skipped {wgerResult.skipped} duplicates.
+          </p>
+        )}
+        {fillResult && (
+          <p className="text-emerald-400 text-sm">
+            Auto-fill done: {fillResult.filled} images added, {fillResult.skipped} not found.
           </p>
         )}
 

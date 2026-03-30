@@ -135,6 +135,50 @@ def delete_exercise(
     db.commit()
 
 
+@router.post("/fill-images")
+async def fill_images(
+    admin: User = Depends(_require_admin),
+    db: Session = Depends(get_db),
+):
+    """Auto-fill missing image_url from ExerciseDB by exercise name. Admin only."""
+    api_key = os.getenv("RAPIDAPI_KEY", "")
+    if not api_key:
+        raise HTTPException(status_code=503, detail="RAPIDAPI_KEY not configured")
+
+    exercises = db.query(GlobalExercise).filter(
+        (GlobalExercise.image_url == None) | (GlobalExercise.image_url == "")
+    ).all()
+
+    filled = 0
+    skipped = 0
+    async with httpx.AsyncClient(timeout=8.0) as client:
+        for ex in exercises:
+            try:
+                encoded = ex.name.lower().replace(" ", "%20")
+                resp = await client.get(
+                    f"https://exercisedb.p.rapidapi.com/exercises/name/{encoded}",
+                    headers={
+                        "X-RapidAPI-Key": api_key,
+                        "X-RapidAPI-Host": "exercisedb.p.rapidapi.com",
+                    },
+                    params={"limit": "1", "offset": "0"},
+                )
+                if resp.status_code == 200:
+                    results = resp.json()
+                    if results:
+                        ex.image_url = results[0]["gifUrl"]
+                        filled += 1
+                    else:
+                        skipped += 1
+                else:
+                    skipped += 1
+            except Exception:
+                skipped += 1
+
+    db.commit()
+    return {"filled": filled, "skipped": skipped}
+
+
 @router.post("/import-wger")
 async def import_from_wger(
     limit: int = 50,

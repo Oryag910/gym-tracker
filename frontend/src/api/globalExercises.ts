@@ -52,3 +52,6 @@ export const importFromWger = (limit = 50, offset = 0) =>
     `/library/import-wger?limit=${limit}&offset=${offset}`
   )
 
+export const fillImages = () =>
+  client.post<{ filled: number; skipped: number }>('/library/fill-images')
+

@@ -38,6 +38,33 @@ def list_workouts(
     return [_to_summary(w) for w in q.all()]
 
 
+@router.get("/last-performance")
+def last_performance(
+    names: str,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Return the most recently logged weight+reps for each exercise name (comma-separated)."""
+    name_list = [n.strip() for n in names.split(",") if n.strip()]
+    result = {}
+    for name in name_list:
+        row = (
+            db.query(Set)
+            .join(Exercise, Set.exercise_id == Exercise.id)
+            .join(Workout, Exercise.workout_id == Workout.id)
+            .filter(
+                Workout.user_id == current_user.id,
+                Exercise.name.ilike(name),
+                Set.weight != None,
+            )
+            .order_by(Workout.date.desc(), Set.set_number.desc())
+            .first()
+        )
+        if row:
+            result[name.lower()] = {"weight": row.weight, "reps": row.reps}
+    return result
+
+
 @router.post("", response_model=WorkoutResponse, status_code=201)
 def create_workout(body: WorkoutCreate, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     workout = Workout(user_id=current_user.id, name=body.name, date=body.date)

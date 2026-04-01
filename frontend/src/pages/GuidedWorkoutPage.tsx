@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams, useLocation } from 'react-router-dom'
 import { getTemplate } from '../api/templates'
 import type { TemplateDetail, TemplateExerciseResponse } from '../api/templates'
-import { createWorkout } from '../api/workouts'
+import { createWorkout, getLastPerformance } from '../api/workouts'
 import { listExercises, type GlobalExercise } from '../api/globalExercises'
 import { useAuth } from '../context/AuthContext'
 import { toDisplayWeight, fromInputWeight, weightUnit } from '../utils/units'
@@ -180,6 +180,9 @@ export default function GuidedWorkoutPage() {
   const skippedQueueRef = useRef(skippedQueue)
   skippedQueueRef.current = skippedQueue
 
+  // Last logged weight+reps per exercise name (keyed lowercase) — used to pre-fill sets
+  const [lastPerf, setLastPerf] = useState<Record<string, { weight: number; reps: number }>>({})
+
   // Add-exercise modal state
   const [showAddModal, setShowAddModal] = useState(false)
   const [addFilter, setAddFilter] = useState('')
@@ -227,6 +230,12 @@ export default function GuidedWorkoutPage() {
         localStorage.removeItem(GUIDED_DRAFT_KEY)
       }
       setPhase({ kind: 'ready', template: r.data })
+
+      // Fetch the user's last logged weight for each exercise — used to pre-fill sets
+      const names = r.data.exercises.map(ex => ex.name)
+      if (names.length > 0) {
+        getLastPerformance(names).then(res => setLastPerf(res.data)).catch(() => {})
+      }
     })
     listExercises().then(r => setLibrary(r.data)).catch(() => {})
   }, [templateId])
@@ -265,15 +274,28 @@ export default function GuidedWorkoutPage() {
     }
   }, []) // empty deps — only the cleanup runs, on unmount
 
+  // Helper: pick weight/reps — last logged takes priority over template target
+  const prefillWeight = (exName: string, targetWeight: number | null) => {
+    const perf = lastPerf[exName.toLowerCase()]
+    if (perf?.weight != null) return String(toDisplayWeight(perf.weight, units.weight))
+    if (targetWeight != null) return String(toDisplayWeight(targetWeight, units.weight))
+    return ''
+  }
+  const prefillReps = (exName: string, targetReps: number | null) => {
+    const perf = lastPerf[exName.toLowerCase()]
+    if (perf?.reps != null) return String(perf.reps)
+    if (targetReps != null) return String(targetReps)
+    return ''
+  }
+
   const beginWorkout = (template: TemplateDetail) => {
     if (template.exercises.length === 0) return
     startTimeRef.current = Date.now()
     const firstEx = template.exercises[0]
     setPhase({
       kind: 'active', template, exerciseIndex: 0, setIndex: 0, completedSets: [],
-      actualWeight: firstEx.sets[0]?.target_weight != null
-        ? String(toDisplayWeight(firstEx.sets[0].target_weight, units.weight)) : '',
-      actualReps: firstEx.sets[0]?.target_reps != null ? String(firstEx.sets[0].target_reps) : '',
+      actualWeight: prefillWeight(firstEx.name, firstEx.sets[0]?.target_weight ?? null),
+      actualReps: prefillReps(firstEx.name, firstEx.sets[0]?.target_reps ?? null),
       actualRpe: '', actualWeightRight: '', actualRepsRight: '',
     })
   }
@@ -283,8 +305,8 @@ export default function GuidedWorkoutPage() {
     const s = ex.sets[setIdx]
     setPhase({
       kind: 'active', template, exerciseIndex: exIdx, setIndex: setIdx, completedSets,
-      actualWeight: s?.target_weight != null ? String(toDisplayWeight(s.target_weight, units.weight)) : '',
-      actualReps: s?.target_reps != null ? String(s.target_reps) : '',
+      actualWeight: prefillWeight(ex.name, s?.target_weight ?? null),
+      actualReps: prefillReps(ex.name, s?.target_reps ?? null),
       actualRpe: '', actualWeightRight: '', actualRepsRight: '',
     })
   }

@@ -50,3 +50,8 @@ export const addSet = (workoutId: number, exerciseId: number, data: { weight?: n
 
 export const deleteSet = (workoutId: number, exerciseId: number, setId: number) =>
   client.delete(`/workouts/${workoutId}/exercises/${exerciseId}/sets/${setId}`)
+
+export const getLastPerformance = (names: string[]) =>
+  client.get<Record<string, { weight: number; reps: number }>>(
+    `/workouts/last-performance?names=${names.map(encodeURIComponent).join(',')}`
+  )

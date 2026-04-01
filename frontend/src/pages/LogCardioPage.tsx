@@ -12,7 +12,10 @@ import {
 import { card, input, btnPrimary, label } from '../styles/tokens'
 import PageTransition from '../components/PageTransition'
 
-const today = () => new Date().toISOString().split('T')[0]
+const today = () => {
+  const d = new Date()
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
 
 // Pace/duration auto-fill helpers (display units — no conversion needed)
 function parsePaceDisplay(str: string): number | null {

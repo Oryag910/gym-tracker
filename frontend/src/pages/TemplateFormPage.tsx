@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { createTemplate, getTemplate, updateTemplate } from '../api/templates'
+import { getLastPerformance } from '../api/workouts'
 import { listExercises, type GlobalExercise } from '../api/globalExercises'
 import type { ExerciseLookup } from '../api/exercises'
 import MuscleMap from '../components/MuscleMap/MuscleMap'
@@ -94,6 +95,20 @@ export default function TemplateFormPage() {
     updateExercise(ei, {
       name: libEx.name, filter: '', showPicker: false, lookup: libraryToLookup(libEx),
     })
+    // Async: fetch last logged weight/reps and pre-fill target fields
+    getLastPerformance([libEx.name]).then(res => {
+      const perf = res.data[libEx.name.toLowerCase()]
+      if (!perf) return
+      const prefillWeight = String(toDisplayWeight(perf.weight, units.weight))
+      const prefillReps = perf.reps != null ? String(perf.reps) : ''
+      setExercises(prev => prev.map((ex, idx) => {
+        if (idx !== ei || ex.name !== libEx.name) return ex
+        return {
+          ...ex,
+          sets: ex.sets.map(s => ({ ...s, target_weight: prefillWeight, target_reps: prefillReps })),
+        }
+      }))
+    }).catch(() => {})
   }
 
   const addExercise = () => setExercises(prev => [...prev, emptyExercise()])

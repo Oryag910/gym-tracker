@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
-import { createWorkout } from '../api/workouts'
+import { createWorkout, getLastPerformance } from '../api/workouts'
 import { listTemplates } from '../api/templates'
 import type { TemplateSummary } from '../api/templates'
 import { listExercises, type GlobalExercise } from '../api/globalExercises'
@@ -10,7 +10,7 @@ import MuscleMap from '../components/MuscleMap/MuscleMap'
 import { card, input, btnPrimary, btnGhost } from '../styles/tokens'
 import PageTransition from '../components/PageTransition'
 import { useAuth } from '../context/AuthContext'
-import { fromInputWeight, weightUnit } from '../utils/units'
+import { fromInputWeight, toDisplayWeight, weightUnit } from '../utils/units'
 
 function LogTechniquePanel({ description, category }: { description: string; category: string | null }) {
   const [expanded, setExpanded] = useState(false)
@@ -106,6 +106,7 @@ export default function LogWorkoutPage() {
   const [saved, setSaved] = useState(false)
   const [error, setError] = useState('')
   const [library, setLibrary] = useState<GlobalExercise[]>([])
+  const [lastPerfMap, setLastPerfMap] = useState<Record<string, { weight: number; reps: number }>>( {})
   // Initialized directly from localStorage so the resume card shows immediately
   // on the first render — no useEffect delay.
   const [showResumeCard, setShowResumeCard] = useState(() => !!localStorage.getItem('workout_draft'))
@@ -202,6 +203,25 @@ export default function LogWorkoutPage() {
       lookup,
       showMuscles: libEx.muscles_primary_ids.length > 0 || libEx.muscles_secondary_ids.length > 0,
     })
+    // Async: fetch last logged weight/reps for this exercise and pre-fill the first set
+    getLastPerformance([libEx.name]).then(res => {
+      const perf = res.data[libEx.name.toLowerCase()]
+      if (!perf) return
+      setLastPerfMap(prev => ({ ...prev, [libEx.name.toLowerCase()]: perf }))
+      setExercises(prev => {
+        const next = prev.map((ex, idx) => {
+          if (idx !== ei || ex.name !== libEx.name) return ex
+          const prefillWeight = String(toDisplayWeight(perf.weight, units.weight))
+          const prefillReps = perf.reps != null ? String(perf.reps) : ''
+          return {
+            ...ex,
+            sets: ex.sets.map((s, si) => si === 0 ? { ...s, weight: prefillWeight, reps: prefillReps } : s),
+          }
+        })
+        saveDraftWith(next)
+        return next
+      })
+    }).catch(() => {})
   }
 
   const handleFilterChange = (i: number, val: string) => {
@@ -221,8 +241,12 @@ export default function LogWorkoutPage() {
   }
 
   const addSet = (i: number) => {
-    const next = exercises.map((ex, idx) =>
-      idx === i ? { ...ex, sets: [...ex.sets, emptySet()] } : ex)
+    const ex = exercises[i]
+    const perf = lastPerfMap[ex.name?.toLowerCase() ?? '']
+    const newSet: SetForm = perf
+      ? { weight: String(toDisplayWeight(perf.weight, units.weight)), reps: perf.reps != null ? String(perf.reps) : '', rpe: '', weight_right: '', reps_right: '', duration: '' }
+      : emptySet()
+    const next = exercises.map((ex, idx) => idx === i ? { ...ex, sets: [...ex.sets, newSet] } : ex)
     saveDraftWith(next)
     setExercises(next)
   }

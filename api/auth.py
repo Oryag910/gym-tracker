@@ -23,11 +23,14 @@ def hash_password(password: str) -> str:
 
 
 def verify_password(plain: str, hashed: str) -> bool:
+    # Demo accounts store an unusable sentinel instead of a bcrypt hash; never let it verify.
+    if not hashed or not hashed.startswith("$2"):
+        return False
     return bcrypt.checkpw(plain.encode(), hashed.encode())
 
 
-def create_access_token(user_id: int) -> str:
-    expire = datetime.utcnow() + timedelta(days=ACCESS_TOKEN_EXPIRE_DAYS)
+def create_access_token(user_id: int, expires_delta: Optional[timedelta] = None) -> str:
+    expire = datetime.utcnow() + (expires_delta or timedelta(days=ACCESS_TOKEN_EXPIRE_DAYS))
     payload = {"sub": str(user_id), "exp": expire}
     return jwt.encode(payload, SECRET_KEY, algorithm=ALGORITHM)
 
@@ -51,5 +54,8 @@ def get_current_user(
 
     user = db.query(User).filter(User.id == int(user_id)).first()
     if user is None:
+        raise credentials_exception
+    # The demo template is a read-only source snapshot; no session may ever act as it.
+    if user.demo_role == "template":
         raise credentials_exception
     return user

@@ -50,7 +50,8 @@ async def register(body: UserRegister, background_tasks: BackgroundTasks, db: Se
 @router.post("/login", response_model=Token)
 def login(body: UserLogin, db: Session = Depends(get_db)):
     user = db.query(User).filter(User.username == body.username).first()
-    if not user or not verify_password(body.password, user.password_hash):
+    # Demo accounts have no password; they are only entered through POST /demo/start.
+    if not user or user.demo_role is not None or not verify_password(body.password, user.password_hash):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid username or password",
@@ -66,7 +67,7 @@ async def forgot_password(
     db: Session = Depends(get_db),
 ):
     user = db.query(User).filter(User.email == body.email).first()
-    if user:
+    if user and user.demo_role is None:
         # Invalidate any existing unused tokens for this user
         db.query(PasswordResetToken).filter(
             PasswordResetToken.user_id == user.id,
@@ -155,7 +156,7 @@ async def forgot_account(
     db: Session = Depends(get_db),
 ):
     user = db.query(User).filter(User.email == body.email).first()
-    if user:
+    if user and user.demo_role is None:
         background_tasks.add_task(send_account_recovery_email, user.email, user.username)
 
     # Always return same response — prevents email enumeration

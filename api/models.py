@@ -21,10 +21,19 @@ class User(Base):
     pref_measure     = Column(String, nullable=True)   # 'cm'  | 'in'
     pref_temp        = Column(String, nullable=True)   # 'c'   | 'f'
 
+    # Recruiter demo accounts. NULL for every real user.
+    #   'template' — the protected, sanitized snapshot that sandboxes are cloned from
+    #   'sandbox'  — a disposable per-visitor copy (expires, see services/demo_service.py)
+    demo_role = Column(String, nullable=True)
+
     workouts = relationship("Workout", back_populates="user", cascade="all, delete-orphan")
     measurements = relationship("Measurement", back_populates="user", cascade="all, delete-orphan")
     cardio_sessions = relationship("CardioSession", back_populates="user", cascade="all, delete-orphan")
     workout_templates = relationship("WorkoutTemplate", back_populates="user", cascade="all, delete-orphan")
+
+    @property
+    def is_demo(self) -> bool:
+        return self.demo_role == "sandbox"
 
 
 class Workout(Base):

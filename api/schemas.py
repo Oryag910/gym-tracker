@@ -39,6 +39,7 @@ class UserResponse(BaseModel):
     username: str
     email: str
     is_admin: bool = False
+    is_demo: bool = False
     unit_system: str = "imperial"
     pref_weight: Optional[str] = None
     pref_body_weight: Optional[str] = None

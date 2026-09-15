@@ -15,8 +15,19 @@ and copy the value of the "token" key. Your account must be the ADMIN_USERNAME u
 
 import argparse
 import json
+import ssl
 import urllib.error
 import urllib.request
+
+
+def _ssl_context():
+    # python.org macOS builds ship without root certificates; certifi (already in
+    # requirements.txt) provides them so HTTPS to Railway verifies properly.
+    try:
+        import certifi
+        return ssl.create_default_context(cafile=certifi.where())
+    except ImportError:
+        return ssl.create_default_context()
 
 
 def main():
@@ -31,7 +42,7 @@ def main():
         method="POST",
     )
     try:
-        with urllib.request.urlopen(req, timeout=120) as resp:
+        with urllib.request.urlopen(req, timeout=120, context=_ssl_context()) as resp:
             report = json.loads(resp.read())
     except urllib.error.HTTPError as e:
         print(f"✗ {e.code}: {e.read().decode('utf-8', errors='replace')[:300]}")

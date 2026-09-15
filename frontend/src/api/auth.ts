@@ -5,6 +5,7 @@ export interface UserResponse {
   username: string
   email: string
   is_admin: boolean
+  is_demo: boolean
   unit_system: string
   pref_weight: string | null
   pref_body_weight: string | null

@@ -3,6 +3,7 @@ import { useNavigate, Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { useAuth } from '../context/AuthContext'
 import * as authApi from '../api/auth'
+import { startDemo } from '../api/demo'
 import { input, btnPrimary } from '../styles/tokens'
 
 export default function LoginPage() {
@@ -12,8 +13,23 @@ export default function LoginPage() {
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+  const [demoLoading, setDemoLoading] = useState(false)
   const { login } = useAuth()
   const navigate = useNavigate()
+
+  const handleTryDemo = async () => {
+    setError('')
+    setDemoLoading(true)
+    try {
+      const res = await startDemo()
+      await login(res.data.access_token)
+      navigate('/')
+    } catch (err: any) {
+      setError(err.response?.data?.detail || 'Demo is unavailable right now')
+    } finally {
+      setDemoLoading(false)
+    }
+  }
 
   const handleLogin = async (e: { preventDefault(): void }) => {
     e.preventDefault()
@@ -59,12 +75,42 @@ export default function LoginPage() {
         transition={{ duration: 0.3 }}
         className="w-full max-w-sm relative"
       >
-        {/* Logo */}
-        <div className="text-center mb-8">
+        {/* Logo + positioning */}
+        <div className="text-center mb-6">
           <div className="text-4xl font-black text-blue-400 tracking-tighter mb-1">
             GymTracker
           </div>
-          <p className="text-slate-500 text-sm">Track your progress. Crush your goals.</p>
+          <p className="text-slate-300 text-sm mt-2">
+            Track training, measure progress, and pick up exactly where you left off.
+          </p>
+          <p className="text-slate-500 text-xs mt-1.5">
+            Strength and cardio tracking with historical analytics, PRs, workout templates, and guided sessions.
+          </p>
+        </div>
+
+        {/* Try Demo */}
+        <motion.button
+          type="button"
+          onClick={handleTryDemo}
+          disabled={demoLoading}
+          whileTap={{ scale: 0.97 }}
+          className={`${btnPrimary} w-full mb-4`}
+        >
+          {demoLoading ? (
+            <span className="flex items-center justify-center gap-2">
+              <svg className="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+              </svg>
+              Preparing your training history…
+            </span>
+          ) : 'Try Demo'}
+        </motion.button>
+
+        <div className="flex items-center gap-3 mb-4">
+          <div className="h-px flex-1 bg-slate-800" />
+          <span className="text-slate-600 text-xs">or sign in</span>
+          <div className="h-px flex-1 bg-slate-800" />
         </div>
 
         {/* Card */}

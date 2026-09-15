@@ -186,6 +186,11 @@ export default function GuidedWorkoutPage() {
   // Last logged weight+reps per exercise name (keyed lowercase) — used to pre-fill sets
   const [lastPerf, setLastPerf] = useState<Record<string, { weight: number; reps: number }>>({})
 
+  // True once the draft has been intentionally cleared (saved-and-navigated-away, or
+  // "Discard"). Prevents the phase-change/unmount/beforeunload savers below from writing
+  // a stale draft back after that. Reset to false whenever a new workout session begins.
+  const draftClearedRef = useRef(false)
+
   // Add-exercise modal state
   const [showAddModal, setShowAddModal] = useState(false)
   const [addFilter, setAddFilter] = useState('')
@@ -193,89 +198,136 @@ export default function GuidedWorkoutPage() {
   const [library, setLibrary] = useState<GlobalExercise[]>([])
 
   useEffect(() => {
-    getTemplate(Number(templateId)).then(r => {
+    let cancelled = false
+
+    async function load() {
+      const templateRes = await getTemplate(Number(templateId))
+      const template = templateRes.data
+
+      // Fetch the user's last logged weight for each exercise — used to pre-fill sets.
+      // Always fetched (both the auto-resume and normal paths need it), and awaited
+      // (with a safe {} fallback) so a fast "Begin Workout" click isn't missing prefill.
+      const names = template.exercises.map(ex => ex.name)
+      const lastPerfPromise: Promise<Record<string, { weight: number; reps: number }>> =
+        names.length > 0
+          ? getLastPerformance(names).then(res => res.data).catch(() => ({}))
+          : Promise.resolve({})
+
       // Check for a saved draft matching this template before showing the ready screen
+      let draft: GuidedDraft | null = null
       try {
         const raw = localStorage.getItem(GUIDED_DRAFT_KEY)
         if (raw) {
-          const draft: GuidedDraft = JSON.parse(raw)
-          if (draft.templateId === Number(templateId) && draft.completedSets.length > 0) {
-            if (location.state?.autoResume) {
-              // Came from the /log resume card — skip the ready screen entirely
-              localStorage.removeItem(GUIDED_DRAFT_KEY)
-              setSkippedQueue(draft.skippedQueue ?? [])
-              if (draft.savedPhase === 'summary') {
-                setPhase({
-                  kind: 'summary', template: draft.template,
-                  completedSets: draft.completedSets,
-                  workoutName: draft.workoutName, date: draft.date,
-                })
-              } else {
-                // goToActive isn't defined yet here, so inline its logic
-                const ex = draft.template.exercises[draft.exerciseIndex]
-                const s = ex?.sets[draft.setIndex]
-                setPhase({
-                  kind: 'active', template: draft.template,
-                  exerciseIndex: draft.exerciseIndex, setIndex: draft.setIndex,
-                  completedSets: draft.completedSets,
-                  actualWeight: s?.target_weight != null
-                    ? String(toDisplayWeight(s.target_weight, units.weight)) : '',
-                  actualReps: s?.target_reps != null ? String(s.target_reps) : '',
-                  actualRpe: '', actualWeightRight: '', actualRepsRight: '',
-                })
-              }
-              return // don't fall through to setPhase({ kind: 'ready' })
-            }
-            setSavedDraft(draft) // no autoResume — show resume card on the ready screen
+          const parsed: GuidedDraft = JSON.parse(raw)
+          if (parsed.templateId === Number(templateId) && parsed.completedSets.length > 0) {
+            draft = parsed
           }
         }
       } catch {
         localStorage.removeItem(GUIDED_DRAFT_KEY)
       }
-      setPhase({ kind: 'ready', template: r.data })
 
-      // Fetch the user's last logged weight for each exercise — used to pre-fill sets
-      const names = r.data.exercises.map(ex => ex.name)
-      if (names.length > 0) {
-        getLastPerformance(names).then(res => setLastPerf(res.data)).catch(() => {})
+      if (draft && location.state?.autoResume) {
+        // Came from the /log resume card — skip the ready screen entirely
+        localStorage.removeItem(GUIDED_DRAFT_KEY)
+        draftClearedRef.current = false // resuming a live session — allow future draft writes
+        setSkippedQueue(draft.skippedQueue ?? [])
+        // Prefill map isn't needed to render the resumed set, so don't block on it here —
+        // just make sure it lands so later exercises in this session still get prefilled.
+        lastPerfPromise.then(perf => { if (!cancelled) setLastPerf(perf) })
+        if (draft.savedPhase === 'summary') {
+          setPhase({
+            kind: 'summary', template: draft.template,
+            completedSets: draft.completedSets,
+            workoutName: draft.workoutName, date: draft.date,
+          })
+        } else {
+          // goToActive isn't defined yet here, so inline its logic
+          const ex = draft.template.exercises[draft.exerciseIndex]
+          const s = ex?.sets[draft.setIndex]
+          setPhase({
+            kind: 'active', template: draft.template,
+            exerciseIndex: draft.exerciseIndex, setIndex: draft.setIndex,
+            completedSets: draft.completedSets,
+            actualWeight: s?.target_weight != null
+              ? String(toDisplayWeight(s.target_weight, units.weight)) : '',
+            actualReps: s?.target_reps != null ? String(s.target_reps) : '',
+            actualRpe: '', actualWeightRight: '', actualRepsRight: '',
+          })
+        }
+        return // don't fall through to setPhase({ kind: 'ready' })
       }
-    })
+
+      if (draft) {
+        setSavedDraft(draft) // no autoResume — show resume card on the ready screen
+      }
+
+      const perf = await lastPerfPromise
+      if (cancelled) return
+      setLastPerf(perf)
+      setPhase({ kind: 'ready', template })
+    }
+
+    load()
     listExercises().then(r => setLibrary(r.data)).catch(() => {})
+
+    return () => { cancelled = true }
   }, [templateId])
 
-  // Save draft to localStorage on unmount — fires when user navigates away mid-workout.
-  // Uses refs so the cleanup always reads the latest state even though deps is empty.
-  useEffect(() => {
-    return () => {
-      const p = phaseRef.current
-      const sq = skippedQueueRef.current
-      const tid = Number(templateId)
-
-      if (p.kind === 'active' && p.completedSets.length > 0) {
-        localStorage.setItem(GUIDED_DRAFT_KEY, JSON.stringify({
-          templateId: tid, template: p.template,
-          exerciseIndex: p.exerciseIndex, setIndex: p.setIndex,
-          completedSets: p.completedSets, skippedQueue: sq,
-          savedPhase: 'active', workoutName: p.template.name, date: today(),
-        }))
-      } else if (p.kind === 'resting' && p.completedSets.length > 0) {
-        // The rest timer can't be resumed — restore to the next active position instead
-        localStorage.setItem(GUIDED_DRAFT_KEY, JSON.stringify({
-          templateId: tid, template: p.template,
-          exerciseIndex: p.nextExerciseIndex, setIndex: p.nextSetIndex,
-          completedSets: p.completedSets, skippedQueue: sq,
-          savedPhase: 'active', workoutName: p.template.name, date: today(),
-        }))
-      } else if (p.kind === 'summary' && p.completedSets.length > 0) {
-        localStorage.setItem(GUIDED_DRAFT_KEY, JSON.stringify({
-          templateId: tid, template: p.template,
-          exerciseIndex: p.template.exercises.length - 1, setIndex: 0,
-          completedSets: p.completedSets, skippedQueue: sq,
-          savedPhase: 'summary', workoutName: p.workoutName, date: p.date,
-        }))
+  // Builds the draft object for a given phase, or null for phases that shouldn't persist
+  // (loading/ready/saving, or active/resting/summary with nothing logged yet).
+  function buildDraft(p: Phase, sq: TemplateExerciseResponse[], tid: number): GuidedDraft | null {
+    if (p.kind === 'active' && p.completedSets.length > 0) {
+      return {
+        templateId: tid, template: p.template,
+        exerciseIndex: p.exerciseIndex, setIndex: p.setIndex,
+        completedSets: p.completedSets, skippedQueue: sq,
+        savedPhase: 'active', workoutName: p.template.name, date: today(),
       }
     }
-  }, []) // empty deps — only the cleanup runs, on unmount
+    if (p.kind === 'resting' && p.completedSets.length > 0) {
+      // The rest timer can't be resumed — restore to the next active position instead
+      return {
+        templateId: tid, template: p.template,
+        exerciseIndex: p.nextExerciseIndex, setIndex: p.nextSetIndex,
+        completedSets: p.completedSets, skippedQueue: sq,
+        savedPhase: 'active', workoutName: p.template.name, date: today(),
+      }
+    }
+    if (p.kind === 'summary' && p.completedSets.length > 0) {
+      return {
+        templateId: tid, template: p.template,
+        exerciseIndex: p.template.exercises.length - 1, setIndex: 0,
+        completedSets: p.completedSets, skippedQueue: sq,
+        savedPhase: 'summary', workoutName: p.workoutName, date: p.date,
+      }
+    }
+    return null
+  }
+
+  // Reads the latest phase/skippedQueue via refs (so it's always current) and writes the
+  // draft — unless it was just intentionally cleared (saved-and-navigated, or "Discard").
+  const saveDraftNow = () => {
+    if (draftClearedRef.current) return
+    const draft = buildDraft(phaseRef.current, skippedQueueRef.current, Number(templateId))
+    if (draft) localStorage.setItem(GUIDED_DRAFT_KEY, JSON.stringify(draft))
+  }
+
+  // Save on every phase change while a workout is in progress — this is what protects
+  // against a hard refresh, since previously the draft was only written on unmount.
+  useEffect(() => {
+    saveDraftNow()
+  }, [phase])
+
+  // Also save on unmount (route change away from this page) and on hard refresh/tab close,
+  // which don't run React's unmount cleanup. Uses refs so both always read latest state.
+  useEffect(() => {
+    window.addEventListener('beforeunload', saveDraftNow)
+    return () => {
+      window.removeEventListener('beforeunload', saveDraftNow)
+      saveDraftNow()
+    }
+  }, []) // empty deps — registers once; saveDraftNow reads current values via refs
 
   // Helper: pick weight/reps — last logged takes priority over template target
   const prefillWeight = (exName: string, targetWeight: number | null) => {
@@ -293,6 +345,7 @@ export default function GuidedWorkoutPage() {
 
   const beginWorkout = (template: TemplateDetail) => {
     if (template.exercises.length === 0) return
+    draftClearedRef.current = false // new session — allow the phase-change effect to persist it
     startTimeRef.current = Date.now()
     const firstEx = template.exercises[0]
     setPhase({
@@ -315,6 +368,7 @@ export default function GuidedWorkoutPage() {
   }
 
   const resumeDraft = (draft: GuidedDraft) => {
+    draftClearedRef.current = false // resuming a live session — allow future draft writes
     setSavedDraft(null)
     localStorage.removeItem(GUIDED_DRAFT_KEY)
     setSkippedQueue(draft.skippedQueue ?? [])
@@ -469,6 +523,7 @@ export default function GuidedWorkoutPage() {
 
   const exitDiscard = () => {
     setShowExitModal(false)
+    draftClearedRef.current = true
     localStorage.removeItem(GUIDED_DRAFT_KEY)
     navigate(-1)
   }
@@ -493,6 +548,7 @@ export default function GuidedWorkoutPage() {
         })),
       }))
       const res = await createWorkout({ name: p.workoutName, date: p.date, exercises })
+      draftClearedRef.current = true
       localStorage.removeItem(GUIDED_DRAFT_KEY)
       navigate(`/workouts/${res.data.id}`)
     } catch (err: any) {
@@ -543,7 +599,7 @@ export default function GuidedWorkoutPage() {
                     Resume
                   </button>
                   <button
-                    onClick={() => { setSavedDraft(null); localStorage.removeItem(GUIDED_DRAFT_KEY) }}
+                    onClick={() => { draftClearedRef.current = true; setSavedDraft(null); localStorage.removeItem(GUIDED_DRAFT_KEY) }}
                     className="text-xs text-slate-500 hover:text-red-400 transition-colors"
                   >
                     Discard
@@ -975,7 +1031,7 @@ export default function GuidedWorkoutPage() {
             <button onClick={() => saveWorkout(phase)} className={`${btnPrimary} w-full py-3`}>
               Save Workout
             </button>
-            <button onClick={() => { localStorage.removeItem(GUIDED_DRAFT_KEY); navigate('/templates') }}
+            <button onClick={() => { draftClearedRef.current = true; localStorage.removeItem(GUIDED_DRAFT_KEY); navigate('/templates') }}
               className="w-full text-slate-500 hover:text-slate-300 text-sm mt-3 transition-colors">
               Discard
             </button>

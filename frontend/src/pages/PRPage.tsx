@@ -121,6 +121,29 @@ export default function PRPage() {
           </div>
         )}
 
+        {/* All-time PR grid — visible until an exercise is selected */}
+        {!loading && !selected && prs.length > 0 && (
+          <div>
+            <h2 className="text-sm font-semibold text-slate-400 uppercase tracking-wide mb-3">
+              All-time PRs · {prs.length} exercises
+            </h2>
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+              {[...prs].sort((a, b) => b.weight - a.weight).map(p => (
+                <button
+                  key={p.exercise}
+                  type="button"
+                  onClick={() => handleSelect(p.exercise)}
+                  className={`${card} text-left hover:border-slate-600 transition-colors`}
+                >
+                  <div className="text-sm text-slate-200 capitalize truncate">{p.exercise}</div>
+                  <div className="text-xl font-black text-amber-400 mt-1">{p.weight} lbs</div>
+                  <div className="text-slate-500 text-xs mt-0.5">{p.date}</div>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* Charts — appear once an exercise is selected */}
         {selected && (
           chartLoading ? (

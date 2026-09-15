@@ -84,7 +84,7 @@ const moreItems = [
 ]
 
 export default function Layout({ children }: { children: React.ReactNode }) {
-  const { logout } = useAuth()
+  const { logout, isDemo } = useAuth()
   const navigate = useNavigate()
   const location = useLocation()
   const [showMore, setShowMore] = useState(false)
@@ -114,9 +114,20 @@ export default function Layout({ children }: { children: React.ReactNode }) {
     <div className="min-h-screen bg-slate-950 text-slate-100">
       {/* Desktop top nav */}
       <nav className="hidden md:flex items-center gap-1 px-6 py-3 border-b border-slate-800 bg-slate-950 sticky top-0 z-20 flex-wrap">
-        <Link to="/" className="text-blue-400 font-bold text-lg mr-6 tracking-tight">
-          GymTracker
-        </Link>
+        <div className="flex items-center gap-2 mr-6">
+          <Link to="/" className="text-blue-400 font-bold text-lg tracking-tight">
+            GymTracker
+          </Link>
+          {isDemo && (
+            <span
+              title="Demo account — changes are temporary"
+              className="px-2 py-0.5 rounded-full text-[11px] font-medium bg-amber-500/10 text-amber-400 border border-amber-500/20 whitespace-nowrap"
+            >
+              <span className="2xl:hidden">Demo</span>
+              <span className="hidden 2xl:inline">Demo account · changes are temporary</span>
+            </span>
+          )}
+        </div>
 
         {navItems.map(item => navLink(item.to, item.label, item.icon))}
 
@@ -138,7 +149,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           onClick={() => { logout(); navigate('/login') }}
           className="ml-auto text-slate-400 hover:text-slate-200 text-sm px-3 py-1.5 rounded-lg hover:bg-slate-800 transition-colors"
         >
-          Logout
+          {isDemo ? 'Exit demo' : 'Logout'}
         </button>
       </nav>
 
@@ -226,11 +237,16 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                 </Link>
               ))}
             </div>
+            {isDemo && (
+              <p className="text-center text-[11px] text-amber-400/90 mt-3">
+                Demo account · changes are temporary
+              </p>
+            )}
             <button
               onClick={() => { logout(); navigate('/login'); setShowMore(false) }}
               className="w-full mt-3 py-3 rounded-xl text-slate-500 hover:text-slate-300 hover:bg-slate-800 text-sm transition-colors"
             >
-              Logout
+              {isDemo ? 'Exit demo' : 'Logout'}
             </button>
           </div>
         </>

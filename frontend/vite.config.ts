@@ -15,6 +15,8 @@ export default defineConfig({
       '/measurements': 'http://localhost:8000',
       '/cardio': 'http://localhost:8000',
       '/health': 'http://localhost:8000',
+      '/templates': 'http://localhost:8000',
+      '/demo': 'http://localhost:8000',
     },
   },
 })

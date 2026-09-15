@@ -19,6 +19,7 @@ export interface UserUnits {
 interface AuthContextType {
   token: string | null
   isAdmin: boolean
+  isDemo: boolean
   unitSystem: UnitSystem       // legacy — use `units` for new code
   units: UserUnits             // resolved per-dimension preferences
   setUnitSystem: (s: UnitSystem) => Promise<void>
@@ -39,6 +40,7 @@ const AuthContext = createContext<AuthContextType | null>(null)
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [token, setToken] = useState<string | null>(() => localStorage.getItem('token'))
   const [isAdmin, setIsAdmin] = useState<boolean>(() => localStorage.getItem('isAdmin') === 'true')
+  const [isDemo, setIsDemo] = useState<boolean>(() => localStorage.getItem('isDemo') === 'true')
   const [unitSystem, setUnitSystemState] = useState<UnitSystem>(
     () => (localStorage.getItem('unitSystem') as UnitSystem) || 'imperial'
   )
@@ -74,6 +76,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const res = await getMe()
       setIsAdmin(res.data.is_admin)
       localStorage.setItem('isAdmin', String(res.data.is_admin))
+      setIsDemo(res.data.is_demo)
+      localStorage.setItem('isDemo', String(res.data.is_demo))
       const us = (res.data.unit_system as UnitSystem) || 'imperial'
       setUnitSystemState(us)
       localStorage.setItem('unitSystem', us)
@@ -86,6 +90,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } catch {
       setIsAdmin(false)
       localStorage.removeItem('isAdmin')
+      setIsDemo(false)
+      localStorage.removeItem('isDemo')
     }
   }
 
@@ -113,14 +119,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const logout = () => {
     localStorage.removeItem('token')
     localStorage.removeItem('isAdmin')
+    localStorage.removeItem('isDemo')
     localStorage.removeItem('unitSystem')
     localStorage.removeItem('pref_weight')
     localStorage.removeItem('pref_body_weight')
     localStorage.removeItem('pref_distance')
     localStorage.removeItem('pref_measure')
     localStorage.removeItem('pref_temp')
+    // In-progress workout drafts are not user-scoped — must not leak between accounts
+    localStorage.removeItem('workout_draft')
+    localStorage.removeItem('guided_workout_draft')
     setToken(null)
     setIsAdmin(false)
+    setIsDemo(false)
     setUnitSystemState('imperial')
     setPrefWeight(null)
     setPrefBodyWeight(null)
@@ -131,7 +142,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   return (
     <AuthContext.Provider value={{
-      token, isAdmin, unitSystem, units,
+      token, isAdmin, isDemo, unitSystem, units,
       setUnitSystem, setUnitPref,
       login: loginFn, logout,
       isAuthenticated: !!token,

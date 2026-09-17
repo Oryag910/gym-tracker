@@ -12,10 +12,15 @@ import { listExercises } from '../api/globalExercises'
 import type { GlobalExercise } from '../api/globalExercises'
 import MuscleMap from '../components/MuscleMap/MuscleMap'
 import ExercisePicker from '../components/ExercisePicker'
-import { card, input, skeleton, btnPrimary, btnDanger } from '../styles/tokens'
+import { card, input, skeleton, btnPrimary, btnDanger, btnOutline, pageTitle } from '../styles/tokens'
+import { formatDateLong, formatWeight, plural } from '../utils/format'
 import PageTransition from '../components/PageTransition'
 import { useAuth } from '../context/AuthContext'
 import { toDisplayWeight, fromInputWeight, weightUnit } from '../utils/units'
+
+// Display helper: canonical lbs → user unit, rounded for reading (no "82.55 kg")
+const showWeight = (lbs: number | null, unitSystem: string, wt: string) =>
+  lbs != null ? `${formatWeight(toDisplayWeight(lbs, unitSystem as any))} ${wt}` : '—'
 
 // ─── SetRow ──────────────────────────────────────────────────────────────────
 
@@ -149,12 +154,14 @@ function SetRow({ set, workoutId, exerciseId, onUpdated, onDeleted, unitSystem, 
         ) : (
           <div className="flex items-center gap-3">
             <span className="text-slate-500 text-sm w-8 text-center shrink-0">{set.set_number}</span>
-            <div className="flex-1 min-w-0 text-sm text-slate-200">
-              <span className="text-blue-300 text-xs font-bold">L</span>{' '}
-              {set.weight != null ? `${toDisplayWeight(set.weight, unitSystem as any)} ${wt}` : '—'} · {set.reps ?? '—'} reps
-              {' / '}
-              <span className="text-amber-300 text-xs font-bold">R</span>{' '}
-              {set.weight_right != null ? `${toDisplayWeight(set.weight_right, unitSystem as any)} ${wt}` : '—'} · {set.reps_right ?? '—'} reps
+            <div className="flex-1 min-w-0 text-sm text-slate-200 tabular-nums">
+              <span className="text-[11px] font-semibold text-blue-300 mr-1">L</span>
+              <span className="font-medium">{showWeight(set.weight, unitSystem, wt)}</span>
+              <span className="text-slate-400"> × {set.reps ?? '—'}</span>
+              <span className="text-slate-600 mx-2">/</span>
+              <span className="text-[11px] font-semibold text-amber-300 mr-1">R</span>
+              <span className="font-medium">{showWeight(set.weight_right, unitSystem, wt)}</span>
+              <span className="text-slate-400"> × {set.reps_right ?? '—'}</span>
               {set.rpe != null && <div className="text-slate-500 text-xs mt-0.5">RPE {set.rpe}</div>}
             </div>
             <button onClick={() => setEditing(true)} className="text-slate-600 hover:text-blue-400 transition-colors text-xs shrink-0">
@@ -203,13 +210,13 @@ function SetRow({ set, workoutId, exerciseId, onUpdated, onDeleted, unitSystem, 
         </>
       ) : (
         <>
-          <span className="text-slate-200 text-sm">
-            {isTimed ? (set.duration != null ? `${set.duration}s` : '—') : `${set.reps ?? '—'} reps`}
+          <span className="text-slate-300 text-sm tabular-nums">
+            {isTimed ? (set.duration != null ? `${set.duration}s` : '—') : (set.reps ?? '—')}
           </span>
-          <span className="text-slate-200 text-sm">
-            {set.weight != null ? `${toDisplayWeight(set.weight, unitSystem as any)} ${wt}` : '—'}
+          <span className="text-slate-100 text-sm font-medium tabular-nums">
+            {showWeight(set.weight, unitSystem, wt)}
           </span>
-          <span className="text-slate-500 text-xs">{set.rpe != null ? `RPE ${set.rpe}` : '—'}</span>
+          <span className="text-slate-500 text-xs tabular-nums">{set.rpe ?? '—'}</span>
           <button onClick={() => setEditing(true)} className="text-slate-600 hover:text-blue-400 transition-colors text-xs">
             Edit
           </button>
@@ -402,9 +409,10 @@ function ExerciseCard({ exercise, workoutId, onUpdated, onSetAdded, onSetDeleted
               </div>
             ) : (
               <div className="text-slate-500 text-xs mt-0.5">
-                {exercise.sets.length} sets
+                {plural(exercise.sets.length, 'set')}
                 {exercise.attachment && <span> · {exercise.attachment}</span>}
                 {exercise.is_unilateral && <span> · Unilateral</span>}
+                {exercise.is_timed && <span> · Timed</span>}
               </div>
             )}
           </div>
@@ -418,7 +426,7 @@ function ExerciseCard({ exercise, workoutId, onUpdated, onSetAdded, onSetDeleted
           </button>
         ) : (
           <button onClick={handleMuscleToggle} disabled={lookupLoading}
-            className="text-xs text-slate-500 hover:text-blue-400 transition-colors border border-slate-700 hover:border-blue-400/40 rounded-lg px-2.5 py-1 shrink-0">
+            className="text-xs text-slate-400 hover:text-blue-400 transition-colors border border-slate-700 hover:border-blue-400/40 rounded-lg px-2.5 py-1 shrink-0">
             {lookupLoading ? '...' : showMuscles ? 'Hide muscles' : 'Muscles'}
           </button>
         )}
@@ -437,14 +445,17 @@ function ExerciseCard({ exercise, workoutId, onUpdated, onSetAdded, onSetDeleted
       {/* Column headers (non-edit mode only) */}
       {!isEditMode && (
         exercise.is_unilateral ? (
-          <div className="text-xs text-slate-500 mb-1">Set · L and R reps / weight · RPE</div>
+          <div className="grid grid-cols-[32px_1fr] gap-3 text-[11px] uppercase tracking-wide text-slate-500 mb-1">
+            <span className="text-center">Set</span>
+            <span>Weight × reps, left / right</span>
+          </div>
         ) : (
-          <div className="grid grid-cols-[32px_1fr_1fr_52px_auto] gap-3 text-xs text-slate-500 mb-1">
+          <div className="grid grid-cols-[32px_1fr_1fr_52px_auto] gap-3 text-[11px] uppercase tracking-wide text-slate-500 mb-1">
             <span className="text-center">Set</span>
             <span>{exercise.is_timed ? 'Duration' : 'Reps'}</span>
-            <span>Weight ({weightUnit(unitSystem as any)})</span>
+            <span>Weight</span>
             <span>RPE</span>
-            <span />
+            <span className="w-7" />
           </div>
         )
       )}
@@ -579,7 +590,7 @@ export default function WorkoutDetailPage() {
   }
 
   if (!workout) return (
-    <div className="space-y-4">
+    <div className="space-y-4 max-w-2xl mx-auto">
       <div className={`${skeleton} h-8 w-48`} />
       <div className={`${skeleton} h-40`} />
       <div className={`${skeleton} h-40`} />
@@ -595,7 +606,7 @@ export default function WorkoutDetailPage() {
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
             </svg>
-            Back
+            Workouts
           </button>
 
           {isEditing ? (
@@ -622,13 +633,16 @@ export default function WorkoutDetailPage() {
               </div>
             </div>
           ) : (
-            <div className="flex items-start justify-between">
-              <div>
-                <h1 className="text-2xl font-black text-slate-100 tracking-tight">{workout.name}</h1>
-                <div className="text-slate-500 text-sm mt-1">{workout.date}</div>
+            <div className="flex items-start justify-between gap-4">
+              <div className="min-w-0">
+                <h1 className={pageTitle}>{workout.name}</h1>
+                <div className="text-slate-400 text-sm mt-1">{formatDateLong(workout.date)}</div>
+                <div className="text-slate-500 text-xs mt-1">
+                  {plural(workout.exercises.length, 'exercise')} · {plural(workout.exercises.reduce((n, ex) => n + ex.sets.length, 0), 'set')}
+                </div>
               </div>
               <div className="flex gap-2 shrink-0">
-                <button onClick={startEditing} className="text-xs px-3 py-2 rounded-xl border border-slate-600 text-slate-400 hover:text-slate-200 hover:border-slate-500 transition-colors">
+                <button onClick={startEditing} className={btnOutline}>
                   Edit
                 </button>
                 <button onClick={() => setShowDeleteModal(true)} className={btnDanger}>

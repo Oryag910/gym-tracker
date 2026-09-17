@@ -3,7 +3,8 @@ import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { listWorkouts } from '../api/workouts'
 import type { WorkoutSummary } from '../api/workouts'
-import { btnPrimary, skeleton } from '../styles/tokens'
+import { btnPrimary, btnOutline, skeleton, input, pageTitle, pageSubtitle, pageHeader, sectionLabel, listRow } from '../styles/tokens'
+import { formatDate, plural } from '../utils/format'
 import PageTransition from '../components/PageTransition'
 
 const PAGE = 20
@@ -61,8 +62,11 @@ export default function WorkoutsPage() {
     <PageTransition>
       <div className="space-y-6">
         {/* Header */}
-        <div className="flex items-center justify-between gap-4">
-          <h1 className="text-2xl font-black text-slate-100 tracking-tight">Workouts</h1>
+        <div className={pageHeader}>
+          <div>
+            <h1 className={pageTitle}>Workouts</h1>
+            <p className={pageSubtitle}>Full training history, newest first</p>
+          </div>
           <button onClick={() => navigate('/log')} className={btnPrimary}>
             + Log Workout
           </button>
@@ -72,13 +76,14 @@ export default function WorkoutsPage() {
         <input
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          placeholder="Search workouts..."
-          className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-slate-100 placeholder:text-slate-500 focus:border-blue-400 focus:outline-none transition-colors"
+          placeholder="Search by workout name…"
+          aria-label="Search workouts"
+          className={input}
         />
 
         {/* Content */}
         {loading ? (
-          <div className="space-y-3">
+          <div className="space-y-2">
             {[1, 2, 3, 4].map(i => <div key={i} className={`${skeleton} h-16`} />)}
           </div>
         ) : filtered.length === 0 ? (
@@ -89,8 +94,9 @@ export default function WorkoutsPage() {
           <div className="space-y-6">
             {grouped.map(([monthKey, monthWorkouts]) => (
               <div key={monthKey}>
-                <div className="text-xs font-semibold text-slate-500 uppercase tracking-widest mb-2 px-1">
-                  {formatMonthKey(monthKey)}
+                <div className="flex items-baseline justify-between mb-2 px-1">
+                  <h2 className={sectionLabel}>{formatMonthKey(monthKey)}</h2>
+                  <span className="text-xs text-slate-600">{plural(monthWorkouts.length, 'workout')}</span>
                 </div>
                 <div className="space-y-2">
                   {monthWorkouts.map((w, i) => (
@@ -98,21 +104,26 @@ export default function WorkoutsPage() {
                       key={w.id}
                       initial={{ opacity: 0, y: 6 }}
                       animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: i * 0.03 }}
-                      whileHover={{ x: 4 }}
+                      transition={{ delay: Math.min(i, 8) * 0.03 }}
                       onClick={() => navigate(`/workouts/${w.id}`)}
-                      className="flex items-center justify-between bg-slate-800 hover:bg-slate-700/80 border border-slate-700 hover:border-blue-400/40 rounded-xl px-5 py-4 cursor-pointer transition-colors"
+                      className={listRow}
                     >
-                      <div className="flex items-center gap-3">
-                        <div className="w-1.5 h-8 rounded-full bg-blue-500/40" />
-                        <div>
-                          <div className="font-semibold text-slate-100">{w.name}</div>
-                          <div className="text-slate-500 text-sm">
-                            {w.date} · {w.exercise_count} exercise{w.exercise_count !== 1 ? 's' : ''}
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className="w-11 shrink-0 text-center">
+                          <div className="text-[11px] uppercase tracking-wide text-slate-500 leading-none">
+                            {formatDate(w.date, { year: false }).split(' ')[0]}
+                          </div>
+                          <div className="text-lg font-semibold text-slate-200 leading-tight tabular-nums">
+                            {w.date.slice(8, 10)}
                           </div>
                         </div>
+                        <div className="w-px h-8 bg-slate-700 shrink-0" />
+                        <div className="min-w-0">
+                          <div className="font-semibold text-slate-100 truncate">{w.name}</div>
+                          <div className="text-slate-500 text-sm">{plural(w.exercise_count, 'exercise')}</div>
+                        </div>
                       </div>
-                      <svg className="w-4 h-4 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <svg className="w-4 h-4 text-slate-600 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                       </svg>
                     </motion.div>
@@ -125,12 +136,8 @@ export default function WorkoutsPage() {
             {!search && (
               hasMore ? (
                 <div className="pt-2 text-center">
-                  <button
-                    onClick={loadMore}
-                    disabled={loadingMore}
-                    className="px-6 py-2.5 rounded-xl text-sm font-medium bg-slate-800 border border-slate-700 text-slate-300 hover:border-blue-400/40 hover:text-slate-100 disabled:opacity-50 transition-colors"
-                  >
-                    {loadingMore ? 'Loading…' : 'Load More'}
+                  <button onClick={loadMore} disabled={loadingMore} className={`${btnOutline} px-6`}>
+                    {loadingMore ? 'Loading…' : 'Load more'}
                   </button>
                 </div>
               ) : loadedCount > PAGE ? (

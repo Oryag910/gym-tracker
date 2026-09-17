@@ -5,15 +5,25 @@ import {
 } from 'recharts'
 import { getPRs, getPRHistory, getExerciseTrend } from '../api/stats'
 import type { PREntry, PRHistoryPoint, TrendPoint } from '../api/stats'
-import { card, skeleton, input } from '../styles/tokens'
+import { card, skeleton, input, pageTitle, pageSubtitle, sectionLabel, cardTitle, btnOutline } from '../styles/tokens'
+import { formatDate, formatWeight, formatCompact, formatInt } from '../utils/format'
 import PageTransition from '../components/PageTransition'
+
+const axisTick = { fill: '#64748b', fontSize: 11 }
+const PR_COLOR = '#f59e0b'
+const VOLUME_COLOR = '#34d399'
+
+// Pad the Y domain so a flat PR line doesn't get zoomed into a 2-lb window
+const paddedDomain: [(min: number) => number, (max: number) => number] = [
+  min => Math.floor(min * 0.9), max => Math.ceil(max * 1.05),
+]
 
 const PRTooltip = ({ active, payload, label }: any) => {
   if (!active || !payload?.length) return null
   return (
     <div className="bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 shadow-xl text-sm">
-      <div className="text-slate-400">{label}</div>
-      <div className="text-amber-400 font-bold">{payload[0].value} lbs</div>
+      <div className="text-slate-400 text-xs">{formatDate(label)}</div>
+      <div className="text-amber-400 font-semibold">{formatWeight(payload[0].value)} lbs</div>
     </div>
   )
 }
@@ -22,8 +32,8 @@ const VolumeTooltip = ({ active, payload, label }: any) => {
   if (!active || !payload?.length) return null
   return (
     <div className="bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 shadow-xl text-sm">
-      <div className="text-slate-400">{label}</div>
-      <div className="text-emerald-400 font-bold">{Number(payload[0].value).toLocaleString()} lbs</div>
+      <div className="text-slate-400 text-xs">{formatDate(label)}</div>
+      <div className="text-emerald-400 font-semibold">{formatInt(payload[0].value)} lbs</div>
     </div>
   )
 }
@@ -57,37 +67,45 @@ export default function PRPage() {
     setChartLoading(false)
   }
 
+  const clearSelection = () => { setSelected(''); setHistory([]); setTrend([]) }
+
   const currentPR = prs.find(p => p.exercise.toLowerCase() === selected.toLowerCase())
+  const sortedPRs = [...prs].sort((a, b) => b.weight - a.weight)
 
   return (
     <PageTransition>
       <div className="space-y-6">
-        <h1 className="text-2xl font-black text-slate-100 tracking-tight">Personal Records</h1>
+        <div>
+          <h1 className={pageTitle}>Personal Records</h1>
+          <p className={pageSubtitle}>Heaviest set ever logged per exercise, with the date it was hit</p>
+        </div>
 
         {/* Exercise picker */}
         {loading ? (
           <div className={`${skeleton} h-12`} />
         ) : prs.length === 0 ? (
           <div className={`${card} text-center py-12`}>
-            <div className="text-4xl mb-3">🏆</div>
             <div className="text-slate-300 font-medium">No PRs yet</div>
             <p className="text-slate-500 text-sm mt-1">Log workouts with weights to track PRs</p>
           </div>
         ) : selected ? (
-          /* Selected state — show exercise name + PR badge + Change button */
-          <div className="flex items-center gap-3">
-            <div className={`${input} flex-1 text-slate-100 capitalize cursor-default`}>{selected}</div>
+          /* Selected state — exercise name + PR readout + back to list */
+          <div className={`${card} flex items-center justify-between gap-4`}>
+            <div className="min-w-0">
+              <div className={sectionLabel}>Exercise</div>
+              <div className="text-lg font-semibold text-slate-100 capitalize truncate mt-0.5">{selected}</div>
+            </div>
             {currentPR && (
               <div className="text-right shrink-0">
-                <div className="text-2xl font-black text-amber-400 leading-none">{currentPR.weight} lbs</div>
-                <div className="text-slate-500 text-xs mt-0.5">{currentPR.date}</div>
+                <div className={sectionLabel}>All-time PR</div>
+                <div className="text-2xl font-bold text-amber-400 leading-none mt-0.5 tabular-nums">
+                  {formatWeight(currentPR.weight)} <span className="text-sm font-medium text-amber-400/70">lbs</span>
+                </div>
+                <div className="text-slate-500 text-xs mt-1">{formatDate(currentPR.date)}</div>
               </div>
             )}
-            <button
-              onClick={() => { setSelected(''); setHistory([]); setTrend([]) }}
-              className="text-xs text-slate-500 hover:text-blue-400 transition-colors shrink-0"
-            >
-              Change
+            <button onClick={clearSelection} className={`${btnOutline} shrink-0 px-3 py-1.5`}>
+              All PRs
             </button>
           </div>
         ) : (
@@ -99,7 +117,8 @@ export default function PRPage() {
               onChange={e => setFilter(e.target.value)}
               onFocus={() => setShowPicker(true)}
               onBlur={() => setTimeout(() => setShowPicker(false), 150)}
-              placeholder="Search exercises..."
+              placeholder="Search exercises…"
+              aria-label="Search exercises"
             />
             {showPicker && (
               <div className="absolute z-20 top-full mt-1 left-0 right-0 bg-slate-800 border border-slate-700 rounded-xl shadow-xl overflow-hidden max-h-64 overflow-y-auto">
@@ -113,7 +132,7 @@ export default function PRPage() {
                       className="w-full flex items-center justify-between px-3 py-2.5 hover:bg-slate-700/60 transition-colors text-left border-b border-slate-700/50 last:border-0"
                     >
                       <span className="text-sm text-slate-200 capitalize">{p.exercise}</span>
-                      <span className="text-xs text-amber-400 font-medium">{p.weight} lbs</span>
+                      <span className="text-xs text-amber-400 font-medium tabular-nums">{formatWeight(p.weight)} lbs</span>
                     </button>
                   ))}
               </div>
@@ -124,20 +143,23 @@ export default function PRPage() {
         {/* All-time PR grid — visible until an exercise is selected */}
         {!loading && !selected && prs.length > 0 && (
           <div>
-            <h2 className="text-sm font-semibold text-slate-400 uppercase tracking-wide mb-3">
-              All-time PRs · {prs.length} exercises
-            </h2>
+            <div className="flex items-baseline justify-between mb-3">
+              <h2 className={sectionLabel}>All-time PRs</h2>
+              <span className="text-xs text-slate-500">{prs.length} exercises · tap one for its progression</span>
+            </div>
             <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-              {[...prs].sort((a, b) => b.weight - a.weight).map(p => (
+              {sortedPRs.map(p => (
                 <button
                   key={p.exercise}
                   type="button"
                   onClick={() => handleSelect(p.exercise)}
-                  className={`${card} text-left hover:border-slate-600 transition-colors`}
+                  className={`${card} p-4 text-left hover:border-amber-400/40 transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-400`}
                 >
-                  <div className="text-sm text-slate-200 capitalize truncate">{p.exercise}</div>
-                  <div className="text-xl font-black text-amber-400 mt-1">{p.weight} lbs</div>
-                  <div className="text-slate-500 text-xs mt-0.5">{p.date}</div>
+                  <div className="text-sm text-slate-300 capitalize truncate">{p.exercise}</div>
+                  <div className="text-xl font-bold text-amber-400 mt-1.5 tabular-nums">
+                    {formatWeight(p.weight)} <span className="text-xs font-medium text-amber-400/70">lbs</span>
+                  </div>
+                  <div className="text-slate-500 text-xs mt-1">{formatDate(p.date)}</div>
                 </button>
               ))}
             </div>
@@ -155,18 +177,21 @@ export default function PRPage() {
             <div className="space-y-4">
               {/* PR Over Time */}
               <div className={card}>
-                <h2 className="font-semibold text-slate-200 mb-4">PR Over Time</h2>
+                <div className="flex items-baseline justify-between mb-4">
+                  <h2 className={cardTitle}>PR progression</h2>
+                  <span className="text-xs text-slate-500">Running max per session</span>
+                </div>
                 {history.length === 0 ? (
                   <p className="text-slate-500 text-center py-8 text-sm">No PR history found.</p>
                 ) : (
                   <ResponsiveContainer width="100%" height={220}>
-                    <LineChart data={history.map(p => ({ date: p.date, weight: p.weight }))}>
-                      <CartesianGrid stroke="#1e293b" strokeDasharray="4 4" />
-                      <XAxis dataKey="date" tick={{ fill: '#64748b', fontSize: 11 }} />
-                      <YAxis tick={{ fill: '#64748b', fontSize: 11 }} unit=" lbs" width={65} domain={['auto', 'auto']} />
+                    <LineChart data={history.map(p => ({ date: p.date, weight: p.weight }))} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
+                      <CartesianGrid stroke="#1e293b" strokeDasharray="4 4" vertical={false} />
+                      <XAxis dataKey="date" tick={axisTick} tickFormatter={d => formatDate(d, { year: false })} minTickGap={24} />
+                      <YAxis tick={axisTick} width={44} domain={paddedDomain} tickFormatter={formatCompact} allowDecimals={false} />
                       <Tooltip content={<PRTooltip />} />
-                      <Line type="monotone" dataKey="weight" stroke="#f59e0b" strokeWidth={2.5}
-                        dot={{ fill: '#f59e0b', r: 4 }} activeDot={{ r: 6 }} />
+                      <Line type="monotone" dataKey="weight" stroke={PR_COLOR} strokeWidth={2.5}
+                        dot={{ fill: PR_COLOR, r: 3.5, strokeWidth: 0 }} activeDot={{ r: 5 }} />
                     </LineChart>
                   </ResponsiveContainer>
                 )}
@@ -174,24 +199,27 @@ export default function PRPage() {
 
               {/* Volume Over Time */}
               <div className={card}>
-                <h2 className="font-semibold text-slate-200 mb-4">Volume Over Time</h2>
+                <div className="flex items-baseline justify-between mb-4">
+                  <h2 className={cardTitle}>Session volume</h2>
+                  <span className="text-xs text-slate-500">weight × reps, per session</span>
+                </div>
                 {trend.length === 0 ? (
                   <p className="text-slate-500 text-center py-8 text-sm">No volume data found.</p>
                 ) : (
                   <ResponsiveContainer width="100%" height={220}>
-                    <AreaChart data={trend.map(t => ({ date: t.date, volume: Math.round(t.total_volume) }))}>
+                    <AreaChart data={trend.map(t => ({ date: t.date, volume: Math.round(t.total_volume) }))} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
                       <defs>
                         <linearGradient id="prVolGrad" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="5%" stopColor="#34d399" stopOpacity={0.35} />
-                          <stop offset="95%" stopColor="#34d399" stopOpacity={0} />
+                          <stop offset="5%" stopColor={VOLUME_COLOR} stopOpacity={0.3} />
+                          <stop offset="95%" stopColor={VOLUME_COLOR} stopOpacity={0} />
                         </linearGradient>
                       </defs>
-                      <CartesianGrid stroke="#1e293b" strokeDasharray="4 4" />
-                      <XAxis dataKey="date" tick={{ fill: '#64748b', fontSize: 11 }} />
-                      <YAxis tick={{ fill: '#64748b', fontSize: 11 }} unit=" lbs" width={70} />
+                      <CartesianGrid stroke="#1e293b" strokeDasharray="4 4" vertical={false} />
+                      <XAxis dataKey="date" tick={axisTick} tickFormatter={d => formatDate(d, { year: false })} minTickGap={24} />
+                      <YAxis tick={axisTick} width={44} tickFormatter={formatCompact} />
                       <Tooltip content={<VolumeTooltip />} />
-                      <Area type="monotone" dataKey="volume" stroke="#34d399" strokeWidth={2.5}
-                        fill="url(#prVolGrad)" dot={{ fill: '#34d399', r: 3 }} />
+                      <Area type="monotone" dataKey="volume" stroke={VOLUME_COLOR} strokeWidth={2}
+                        fill="url(#prVolGrad)" dot={{ fill: VOLUME_COLOR, r: 2.5, strokeWidth: 0 }} />
                     </AreaChart>
                   </ResponsiveContainer>
                 )}

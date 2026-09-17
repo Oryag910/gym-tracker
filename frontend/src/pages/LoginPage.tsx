@@ -83,9 +83,6 @@ export default function LoginPage() {
           <p className="text-slate-300 text-sm mt-2">
             Track training, measure progress, and pick up exactly where you left off.
           </p>
-          <p className="text-slate-500 text-xs mt-1.5">
-            Strength and cardio tracking with historical analytics, PRs, workout templates, and guided sessions.
-          </p>
         </div>
 
         {/* Try Demo */}
@@ -94,7 +91,7 @@ export default function LoginPage() {
           onClick={handleTryDemo}
           disabled={demoLoading}
           whileTap={{ scale: 0.97 }}
-          className={`${btnPrimary} w-full mb-4`}
+          className={`${btnPrimary} w-full mb-4 py-3 text-base`}
         >
           {demoLoading ? (
             <span className="flex items-center justify-center gap-2">
@@ -104,8 +101,11 @@ export default function LoginPage() {
               </svg>
               Preparing your training history…
             </span>
-          ) : 'Try Demo'}
+          ) : 'Try the demo'}
         </motion.button>
+        <p className="text-center text-xs text-slate-500 -mt-2 mb-5">
+          Opens a private sandbox with 300+ real workouts, PRs, and templates. No sign-up.
+        </p>
 
         <div className="flex items-center gap-3 mb-4">
           <div className="h-px flex-1 bg-slate-800" />
@@ -137,6 +137,7 @@ export default function LoginPage() {
               <input
                 className={input}
                 placeholder="Username"
+                aria-label="Username"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
                 required
@@ -164,17 +165,15 @@ export default function LoginPage() {
                 className={input}
                 type="password"
                 placeholder="Password"
+                aria-label="Password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
               />
               {tab === 'login' && (
-                <div className="flex justify-between mt-1.5">
-                  <Link to="/forgot-password" className="text-xs text-slate-600 hover:text-blue-400 transition-colors">
+                <div className="flex justify-end mt-1.5">
+                  <Link to="/forgot-password" className="text-xs text-slate-500 hover:text-blue-400 transition-colors">
                     Forgot password?
-                  </Link>
-                  <Link to="/forgot-password" className="text-xs text-slate-600 hover:text-blue-400 transition-colors">
-                    Forgot account?
                   </Link>
                 </div>
               )}

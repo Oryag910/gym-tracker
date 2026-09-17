@@ -1,17 +1,29 @@
+# Python
 venv/
 __pycache__/
 *.pyc
 *.pyo
-.env
-data/gym.db
-.DS_Store
 *.egg-info/
+.pytest_cache/
 
+# Environment / local data
+.env
+data/
+*.db
+
+# Frontend
 frontend/node_modules/
 frontend/dist/
 frontend/.env.local
 
-mobile/node_modules/
-mobile/.expo/
-mobile/dist/
-.pytest_cache/
+# Personal training logs used by the one-off import pipeline (scripts/)
+scripts/workouts_raw.txt
+scripts/workouts_parsed.json
+scripts/exercise_names.txt
+
+# Editor / tooling
+.DS_Store
+.VSCodeCounter/
+.claude/
+CLAUDE.md
+claude.md

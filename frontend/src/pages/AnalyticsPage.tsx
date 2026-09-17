@@ -17,7 +17,8 @@ import {
   toDisplayDistance, distanceUnit,
   toDisplayMeasure, measureUnit,
 } from '../utils/units'
-import { card, skeleton, input } from '../styles/tokens'
+import { card, skeleton, input, pageTitle, pageSubtitle, cardTitle } from '../styles/tokens'
+import { formatDate, formatCompact, formatInt, formatWeight } from '../utils/format'
 import PageTransition from '../components/PageTransition'
 import ComparePage from './ComparePage'
 
@@ -27,8 +28,8 @@ const VolumeTooltip = ({ active, payload, label, unit }: any) => {
   if (!active || !payload?.length) return null
   return (
     <div className="bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 shadow-xl text-sm">
-      <div className="text-slate-400 text-xs">{label}</div>
-      <div className="text-emerald-400 font-bold">{Number(payload[0].value).toLocaleString()} {unit ?? 'lbs'}</div>
+      <div className="text-slate-400 text-xs">{formatDate(label)}</div>
+      <div className="text-emerald-400 font-semibold">{formatInt(payload[0].value)} {unit ?? 'lbs'}</div>
     </div>
   )
 }
@@ -37,10 +38,10 @@ const TrendTooltip = ({ active, payload, label }: any) => {
   if (!active || !payload?.length) return null
   return (
     <div className="bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 shadow-xl text-sm space-y-1">
-      <div className="text-slate-400 text-xs">{label}</div>
+      <div className="text-slate-400 text-xs">{formatDate(label)}</div>
       {payload.map((p: any) => (
-        <div key={p.dataKey} style={{ color: p.color }} className="font-bold">
-          {p.name}: {Number(p.value).toLocaleString()} lbs
+        <div key={p.dataKey} style={{ color: p.color }} className="font-semibold">
+          {p.name}: {formatInt(p.value)} lbs
         </div>
       ))}
     </div>
@@ -51,8 +52,8 @@ const PRTooltip = ({ active, payload, label }: any) => {
   if (!active || !payload?.length) return null
   return (
     <div className="bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 shadow-xl text-sm">
-      <div className="text-slate-400 text-xs">{label}</div>
-      <div className="text-amber-400 font-bold">{payload[0].value} lbs</div>
+      <div className="text-slate-400 text-xs">{formatDate(label)}</div>
+      <div className="text-amber-400 font-semibold">{formatWeight(payload[0].value)} lbs</div>
     </div>
   )
 }
@@ -61,8 +62,8 @@ const MeasureTooltip = ({ active, payload, label, unit }: any) => {
   if (!active || !payload?.length) return null
   return (
     <div className="bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 shadow-xl text-sm">
-      <div className="text-slate-400 text-xs">{label}</div>
-      <div className="text-violet-400 font-bold">{Number(payload[0].value).toFixed(1)} {unit}</div>
+      <div className="text-slate-400 text-xs">{formatDate(label)}</div>
+      <div className="text-violet-400 font-semibold">{Number(payload[0].value).toFixed(1)} {unit}</div>
     </div>
   )
 }
@@ -164,15 +165,21 @@ function LibraryPicker({
   )
 }
 
+// ─── Shared chart styling ────────────────────────────────────────────────────
+
+const axisTick = { fill: '#64748b', fontSize: 11 }
+const chartMargin = { top: 8, right: 8, left: 0, bottom: 0 }
+const dateTick = (d: string) => formatDate(d, { year: false })
+
 // ─── Range filter helper ─────────────────────────────────────────────────────
 
 function RangeButtons({ range, setRange }: { range: number; setRange: (d: number) => void }) {
   return (
-    <div className="flex gap-1 mb-5">
+    <div className="flex gap-1 mb-5" role="group" aria-label="Time range">
       {RANGES.map(r => (
-        <button key={r.days} onClick={() => setRange(r.days)}
+        <button key={r.days} onClick={() => setRange(r.days)} aria-pressed={range === r.days}
           className={`px-3 py-1 rounded-lg text-xs font-medium transition-colors ${
-            range === r.days ? 'bg-slate-600 text-slate-100' : 'text-slate-500 hover:text-slate-300'
+            range === r.days ? 'bg-slate-700 text-slate-100' : 'text-slate-500 hover:text-slate-300'
           }`}>
           {r.label}
         </button>
@@ -205,7 +212,7 @@ export default function AnalyticsPage() {
   const [prList, setPrList] = useState<PREntry[]>([])
   const [prHistory, setPrHistory] = useState<PRHistoryPoint[]>([])
   const [prExercise, setPrExercise] = useState('')
-  const [prRange, setPrRange] = useState(30)
+  const [prRange, setPrRange] = useState(9999) // all-time: a running-max chart needs the full history
   const [prLoading, setPrLoading] = useState(false)
   const [prFilter, setPrFilter] = useState('')
   const [prShowPicker, setPrShowPicker] = useState(false)
@@ -270,9 +277,12 @@ export default function AnalyticsPage() {
     })
   }, [tab])
 
-  // Auto-load first PR exercise once the PR list arrives
+  // Auto-load the heaviest PR once the list arrives — the most interesting default chart
   useEffect(() => {
-    if (prList.length > 0 && !prExercise) loadPRHistory(prList[0].exercise)
+    if (prList.length > 0 && !prExercise) {
+      const heaviest = prList.reduce((best, p) => (p.weight > best.weight ? p : best), prList[0])
+      loadPRHistory(heaviest.exercise)
+    }
   }, [prList])
 
   const loadPRHistory = async (exercise: string) => {
@@ -362,24 +372,29 @@ export default function AnalyticsPage() {
   return (
     <PageTransition>
       <div className="space-y-6">
-        <h1 className="text-2xl font-black text-slate-100 tracking-tight">Analytics</h1>
+        <div>
+          <h1 className={pageTitle}>Analytics</h1>
+          <p className={pageSubtitle}>Trends computed from every logged workout</p>
+        </div>
 
-        {/* Tab switcher */}
-        <div className="flex gap-1 p-1 bg-slate-800 rounded-xl w-fit flex-wrap">
-          {tabs.map(t => (
-            <button key={t.key} onClick={() => setTab(t.key)}
-              className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
-                tab === t.key ? 'bg-blue-500 text-slate-950' : 'text-slate-400 hover:text-slate-200'
-              }`}>
-              {t.label}
-            </button>
-          ))}
+        {/* Tab switcher — scrolls horizontally on narrow screens */}
+        <div className="-mx-4 px-4 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          <div className="flex gap-1 p-1 bg-slate-800 rounded-xl w-fit">
+            {tabs.map(t => (
+              <button key={t.key} onClick={() => setTab(t.key)} aria-pressed={tab === t.key}
+                className={`px-3.5 py-2 rounded-lg text-sm font-medium transition-all whitespace-nowrap ${
+                  tab === t.key ? 'bg-blue-500 text-slate-950' : 'text-slate-400 hover:text-slate-200'
+                }`}>
+                {t.label}
+              </button>
+            ))}
+          </div>
         </div>
 
         {/* ── Volume chart ─────────────────────────────────────── */}
         {tab === 'volume' && (
           <div className={card}>
-            <h2 className="font-semibold text-slate-200 mb-4">Volume per Session</h2>
+            <div className="flex items-baseline justify-between mb-4"><h2 className={cardTitle}>Volume per session</h2><span className="text-xs text-slate-500">weight × reps · {wt}</span></div>
             {loading ? (
               <div className={`${skeleton} h-56`} />
             ) : volume.length === 0 ? (
@@ -428,16 +443,16 @@ export default function AnalyticsPage() {
                   </div>
                 ) : (
                   <ResponsiveContainer width="100%" height={260}>
-                    <AreaChart data={filteredVolume.map(v => ({ date: v.date, volume: Math.round(toDisplayWeight(v.volume, units.weight)), name: v.workout_name }))}>
+                    <AreaChart margin={chartMargin} data={filteredVolume.map(v => ({ date: v.date, volume: Math.round(toDisplayWeight(v.volume, units.weight)), name: v.workout_name }))}>
                       <defs>
                         <linearGradient id="volGrad" x1="0" y1="0" x2="0" y2="1">
                           <stop offset="5%" stopColor="#34d399" stopOpacity={0.35} />
                           <stop offset="95%" stopColor="#34d399" stopOpacity={0} />
                         </linearGradient>
                       </defs>
-                      <CartesianGrid stroke="#1e293b" strokeDasharray="4 4" />
-                      <XAxis dataKey="date" tick={{ fill: '#64748b', fontSize: 12 }} />
-                      <YAxis tick={{ fill: '#64748b', fontSize: 12 }} unit={` ${wt}`} width={70} />
+                      <CartesianGrid stroke="#1e293b" strokeDasharray="4 4" vertical={false} />
+                      <XAxis dataKey="date" tick={axisTick} tickFormatter={dateTick} minTickGap={24} />
+                      <YAxis tick={axisTick} width={44} tickFormatter={formatCompact} />
                       <Tooltip content={<VolumeTooltip unit={wt} />} />
                       <Area type="monotone" dataKey="volume" stroke="#34d399" strokeWidth={2.5} fill="url(#volGrad)" dot={{ fill: '#34d399', r: 3 }} />
                     </AreaChart>
@@ -451,7 +466,7 @@ export default function AnalyticsPage() {
         {/* ── Exercise Volume ───────────────────────────────────── */}
         {tab === 'exercise_volume' && (
           <div className={card}>
-            <h2 className="font-semibold text-slate-200 mb-4">Exercise Volume Over Time</h2>
+            <div className="flex items-baseline justify-between mb-4"><h2 className={cardTitle}>Exercise volume</h2><span className="text-xs text-slate-500">per session · {wt}</span></div>
             <div className="mb-4">
               <LibraryPicker
                 selected={exVolExercise} filter={exVolFilter} showPicker={exVolShowPicker} library={library}
@@ -477,16 +492,16 @@ export default function AnalyticsPage() {
               <>
                 <div className="text-xs text-slate-500 capitalize mb-2">{exVolExercise}</div>
                 <ResponsiveContainer width="100%" height={260}>
-                  <AreaChart data={filteredExVol}>
+                  <AreaChart margin={chartMargin} data={filteredExVol}>
                     <defs>
                       <linearGradient id="exVolGrad" x1="0" y1="0" x2="0" y2="1">
                         <stop offset="5%" stopColor="#34d399" stopOpacity={0.35} />
                         <stop offset="95%" stopColor="#34d399" stopOpacity={0} />
                       </linearGradient>
                     </defs>
-                    <CartesianGrid stroke="#1e293b" strokeDasharray="4 4" />
-                    <XAxis dataKey="date" tick={{ fill: '#64748b', fontSize: 12 }} />
-                    <YAxis tick={{ fill: '#64748b', fontSize: 12 }} unit={` ${wt}`} width={70} />
+                    <CartesianGrid stroke="#1e293b" strokeDasharray="4 4" vertical={false} />
+                    <XAxis dataKey="date" tick={axisTick} tickFormatter={dateTick} minTickGap={24} />
+                    <YAxis tick={axisTick} width={44} tickFormatter={formatCompact} />
                     <Tooltip content={<VolumeTooltip unit={wt} />} />
                     <Area type="monotone" dataKey="volume" stroke="#34d399" strokeWidth={2.5} fill="url(#exVolGrad)" dot={{ fill: '#34d399', r: 3 }} />
                   </AreaChart>
@@ -499,7 +514,7 @@ export default function AnalyticsPage() {
         {/* ── PR Progress ───────────────────────────────────────── */}
         {tab === 'prs' && (
           <div className={card}>
-            <h2 className="font-semibold text-slate-200 mb-4">PR Progress</h2>
+            <div className="flex items-baseline justify-between mb-4"><h2 className={cardTitle}>PR progression</h2><span className="text-xs text-slate-500">running max · lbs</span></div>
             {loading || prListLoading ? (
               <div className={`${skeleton} h-56`} />
             ) : prList.length === 0 ? (
@@ -535,7 +550,7 @@ export default function AnalyticsPage() {
                               onMouseDown={() => { setPrFilter(''); setPrShowPicker(false); loadPRHistory(p.exercise) }}
                               className="w-full flex items-center justify-between px-3 py-2.5 hover:bg-slate-700/60 transition-colors text-left border-b border-slate-700/50 last:border-0">
                               <span className="text-sm text-slate-200 capitalize">{p.exercise}</span>
-                              <span className="text-xs text-amber-400 font-medium">{p.weight} lbs</span>
+                              <span className="text-xs text-amber-400 font-medium tabular-nums">{formatWeight(p.weight)} lbs</span>
                             </button>
                           ))}
                       </div>
@@ -555,15 +570,15 @@ export default function AnalyticsPage() {
                   <>
                     <div className="flex items-center justify-between mb-2">
                       <span className="text-xs text-slate-500 capitalize">{prExercise}</span>
-                      <span className="text-xs text-amber-400 font-medium">
-                        Current PR: {prMap[prExercise.toLowerCase()] ?? '—'} lbs
+                      <span className="text-xs text-amber-400 font-medium tabular-nums">
+                        Current PR: {prMap[prExercise.toLowerCase()] != null ? formatWeight(prMap[prExercise.toLowerCase()]) : '—'} lbs
                       </span>
                     </div>
                     <ResponsiveContainer width="100%" height={260}>
-                      <LineChart data={filteredPRHistory}>
-                        <CartesianGrid stroke="#1e293b" strokeDasharray="4 4" />
-                        <XAxis dataKey="date" tick={{ fill: '#64748b', fontSize: 11 }} />
-                        <YAxis tick={{ fill: '#64748b', fontSize: 11 }} unit=" lbs" width={65} domain={['auto', 'auto']} />
+                      <LineChart margin={chartMargin} data={filteredPRHistory}>
+                        <CartesianGrid stroke="#1e293b" strokeDasharray="4 4" vertical={false} />
+                        <XAxis dataKey="date" tick={axisTick} tickFormatter={dateTick} minTickGap={24} />
+                        <YAxis tick={axisTick} width={44} tickFormatter={formatCompact} domain={[(min: number) => Math.floor(min * 0.9), (max: number) => Math.ceil(max * 1.05)]} allowDecimals={false} />
                         <Tooltip content={<PRTooltip />} />
                         <Line type="monotone" dataKey="weight" stroke="#f59e0b" strokeWidth={2.5}
                           dot={{ fill: '#f59e0b', r: 4 }} activeDot={{ r: 6 }} name="PR Weight" />
@@ -579,7 +594,7 @@ export default function AnalyticsPage() {
         {/* ── Exercise Trend ────────────────────────────────────── */}
         {tab === 'exercise' && (
           <div className={card}>
-            <h2 className="font-semibold text-slate-200 mb-4">Exercise Trend</h2>
+            <div className="flex items-baseline justify-between mb-4"><h2 className={cardTitle}>Exercise trend</h2><span className="text-xs text-slate-500">max weight and volume · lbs</span></div>
             <div className="mb-4">
               <LibraryPicker
                 selected={trendExercise} filter={trendFilter} showPicker={trendShowPicker} library={library}
@@ -608,12 +623,12 @@ export default function AnalyticsPage() {
                   </div>
                 ) : (
                   <ResponsiveContainer width="100%" height={260}>
-                    <LineChart data={filteredTrend.map(t => ({ date: t.date, 'Max Weight': t.max_weight, 'Volume': Math.round(t.total_volume) }))}>
-                      <CartesianGrid stroke="#1e293b" strokeDasharray="4 4" />
-                      <XAxis dataKey="date" tick={{ fill: '#64748b', fontSize: 12 }} />
-                      <YAxis tick={{ fill: '#64748b', fontSize: 12 }} />
+                    <LineChart margin={chartMargin} data={filteredTrend.map(t => ({ date: t.date, 'Max Weight': t.max_weight, 'Volume': Math.round(t.total_volume) }))}>
+                      <CartesianGrid stroke="#1e293b" strokeDasharray="4 4" vertical={false} />
+                      <XAxis dataKey="date" tick={axisTick} tickFormatter={dateTick} minTickGap={24} />
+                      <YAxis tick={axisTick} width={44} tickFormatter={formatCompact} />
                       <Tooltip content={<TrendTooltip />} />
-                      <Legend />
+                      <Legend wrapperStyle={{ fontSize: 12, paddingTop: 8 }} iconType="circle" iconSize={8} />
                       {pr && (
                         <ReferenceLine y={pr} stroke="#f59e0b" strokeDasharray="5 5"
                           label={{ value: 'PR', fill: '#f59e0b', fontSize: 11 }} />
@@ -631,7 +646,7 @@ export default function AnalyticsPage() {
         {/* ── Body Measurements ─────────────────────────────────── */}
         {tab === 'body' && (
           <div className={card}>
-            <h2 className="font-semibold text-slate-200 mb-4">Body Measurements</h2>
+            <div className="flex items-baseline justify-between mb-4"><h2 className={cardTitle}>Body measurements</h2><span className="text-xs text-slate-500">{measureFieldUnit}</span></div>
             {loading ? (
               <div className={`${skeleton} h-56`} />
             ) : measurements.length === 0 ? (
@@ -661,10 +676,10 @@ export default function AnalyticsPage() {
                   </div>
                 ) : (
                   <ResponsiveContainer width="100%" height={260}>
-                    <LineChart data={measureChartData}>
-                      <CartesianGrid stroke="#1e293b" strokeDasharray="4 4" />
-                      <XAxis dataKey="date" tick={{ fill: '#64748b', fontSize: 12 }} />
-                      <YAxis tick={{ fill: '#64748b', fontSize: 12 }} unit={` ${measureFieldUnit}`} width={70} domain={['auto', 'auto']} />
+                    <LineChart margin={chartMargin} data={measureChartData}>
+                      <CartesianGrid stroke="#1e293b" strokeDasharray="4 4" vertical={false} />
+                      <XAxis dataKey="date" tick={axisTick} tickFormatter={dateTick} minTickGap={24} />
+                      <YAxis tick={axisTick} width={44} domain={['auto', 'auto']} />
                       <Tooltip content={<MeasureTooltip unit={measureFieldUnit} />} />
                       <Line type="monotone" dataKey="value" stroke="#a78bfa" strokeWidth={2.5}
                         dot={{ fill: '#a78bfa', r: 4 }} activeDot={{ r: 6 }} />
@@ -679,7 +694,7 @@ export default function AnalyticsPage() {
         {/* ── Cardio ────────────────────────────────────────────── */}
         {tab === 'cardio' && (
           <div className={card}>
-            <h2 className="font-semibold text-slate-200 mb-4">Cardio Trends</h2>
+            <div className="flex items-baseline justify-between mb-4"><h2 className={cardTitle}>Cardio</h2><span className="text-xs text-slate-500">{cardioMetricLabel}</span></div>
             {loading ? (
               <div className={`${skeleton} h-56`} />
             ) : cardioSessions.length === 0 ? (
@@ -725,16 +740,16 @@ export default function AnalyticsPage() {
                   </div>
                 ) : (
                   <ResponsiveContainer width="100%" height={260}>
-                    <AreaChart data={filteredCardio}>
+                    <AreaChart margin={chartMargin} data={filteredCardio}>
                       <defs>
                         <linearGradient id="cardioGrad" x1="0" y1="0" x2="0" y2="1">
                           <stop offset="5%" stopColor="#60a5fa" stopOpacity={0.35} />
                           <stop offset="95%" stopColor="#60a5fa" stopOpacity={0} />
                         </linearGradient>
                       </defs>
-                      <CartesianGrid stroke="#1e293b" strokeDasharray="4 4" />
-                      <XAxis dataKey="date" tick={{ fill: '#64748b', fontSize: 12 }} />
-                      <YAxis tick={{ fill: '#64748b', fontSize: 12 }} unit={` ${cardioMetricLabel}`} width={70} />
+                      <CartesianGrid stroke="#1e293b" strokeDasharray="4 4" vertical={false} />
+                      <XAxis dataKey="date" tick={axisTick} tickFormatter={dateTick} minTickGap={24} />
+                      <YAxis tick={axisTick} width={44} />
                       <Tooltip content={<VolumeTooltip unit={cardioMetricLabel} />} />
                       <Area type="monotone" dataKey="value" stroke="#60a5fa" strokeWidth={2.5}
                         fill="url(#cardioGrad)" dot={{ fill: '#60a5fa', r: 3 }} />

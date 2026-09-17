@@ -6,7 +6,8 @@ import { createWorkout, getLastPerformance } from '../api/workouts'
 import { listExercises, type GlobalExercise } from '../api/globalExercises'
 import { useAuth } from '../context/AuthContext'
 import { toDisplayWeight, fromInputWeight, weightUnit } from '../utils/units'
-import { card, input, btnPrimary } from '../styles/tokens'
+import { card, input, btnPrimary, btnOutline, pageTitle, sectionLabel, cardTitle } from '../styles/tokens'
+import { formatWeight, plural } from '../utils/format'
 import PageTransition from '../components/PageTransition'
 
 const today = () => {
@@ -50,6 +51,10 @@ type Phase =
   | { kind: 'resting'; template: TemplateDetail; exerciseIndex: number; setIndex: number; completedSets: CompletedSet[]; totalSeconds: number; restType: 'set' | 'exercise'; nextExerciseIndex: number; nextSetIndex: number }
   | { kind: 'summary'; template: TemplateDetail; completedSets: CompletedSet[]; workoutName: string; date: string }
   | { kind: 'saving' }
+
+// Low-emphasis text buttons under the primary "Log set" action
+const secondaryAction =
+  'px-2.5 py-1.5 rounded-lg text-slate-400 hover:text-slate-100 hover:bg-slate-700/60 transition-colors'
 
 function formatTime(sec: number) {
   const m = Math.floor(sec / 60)
@@ -110,7 +115,7 @@ function RestTimer({ phase, onDone, onSkip, onAdd }: {
 
   return (
     <div className="flex flex-col items-center gap-6 py-4">
-      <div className="text-slate-400 text-sm font-medium uppercase tracking-wide">
+      <div className={sectionLabel}>
         {phase.restType === 'exercise' ? 'Rest before next exercise' : 'Rest between sets'}
       </div>
 
@@ -132,21 +137,15 @@ function RestTimer({ phase, onDone, onSkip, onAdd }: {
 
       {/* Buttons */}
       <div className="flex gap-3">
-        <button onClick={() => handleAdd(30)} className="px-3 py-2 rounded-xl bg-slate-700/50 border border-slate-600 text-slate-300 text-sm hover:bg-slate-700 transition-colors">
-          +30s
-        </button>
-        <button onClick={() => handleAdd(60)} className="px-3 py-2 rounded-xl bg-slate-700/50 border border-slate-600 text-slate-300 text-sm hover:bg-slate-700 transition-colors">
-          +60s
-        </button>
-        <button onClick={onSkip} className="px-4 py-2 rounded-xl bg-slate-700/50 border border-slate-600 text-slate-300 text-sm hover:bg-slate-700 transition-colors font-medium">
-          Skip Rest
-        </button>
+        <button onClick={() => handleAdd(30)} className={btnOutline}>+30s</button>
+        <button onClick={() => handleAdd(60)} className={btnOutline}>+60s</button>
+        <button onClick={onSkip} className={`${btnOutline} px-5`}>Skip rest</button>
       </div>
 
       {/* Coming up */}
       {!isLastExercise && nextEx && (
         <div className="text-center">
-          <div className="text-xs text-slate-500 uppercase tracking-wide mb-1">Coming up</div>
+          <div className={`${sectionLabel} mb-1`}>Up next</div>
           <div className="text-slate-300 font-medium">{nextEx.name}</div>
           {phase.nextSetIndex < nextEx.sets.length && (
             <div className="text-slate-500 text-sm">Set {phase.nextSetIndex + 1}</div>
@@ -579,7 +578,7 @@ export default function GuidedWorkoutPage() {
               </svg>
               Back to Templates
             </button>
-            <h1 className="text-2xl font-black text-slate-100 tracking-tight">{template.name}</h1>
+            <h1 className={pageTitle}>{template.name}</h1>
             {template.description && <p className="text-slate-400 text-sm mt-1">{template.description}</p>}
           </div>
 
@@ -610,30 +609,37 @@ export default function GuidedWorkoutPage() {
           )}
 
           <div className={card}>
-            <h2 className="font-semibold text-slate-200 mb-3">Workout Overview</h2>
-            <div className="space-y-2">
-              {template.exercises.map((ex) => (
-                <div key={ex.id} className="flex items-center justify-between py-1.5 border-b border-slate-700/50 last:border-0">
-                  <div>
-                    <span className="text-slate-300 text-sm font-medium">{ex.name}</span>
-                    <span className="text-slate-500 text-xs ml-2">{ex.sets.length} set{ex.sets.length !== 1 ? 's' : ''}</span>
-                    {ex.attachment && <span className="text-slate-500 text-xs ml-2">· {ex.attachment}</span>}
-                    {ex.is_unilateral && <span className="text-blue-400 text-xs ml-2">Unilateral</span>}
+            <div className="flex items-baseline justify-between mb-3">
+              <h2 className={cardTitle}>Plan</h2>
+              <span className="text-xs text-slate-500">
+                {plural(template.exercises.length, 'exercise')} · {plural(totalSetCount(template.exercises), 'set')}
+              </span>
+            </div>
+            <div>
+              {template.exercises.map((ex, i) => (
+                <div key={ex.id} className="flex items-start gap-3 py-2 border-b border-slate-700/50 last:border-0">
+                  <span className="w-5 shrink-0 text-xs text-slate-600 tabular-nums pt-0.5 text-right">{i + 1}</span>
+                  <div className="flex-1 min-w-0">
+                    <div className="text-slate-200 text-sm font-medium">{ex.name}</div>
+                    <div className="text-slate-500 text-xs mt-0.5">
+                      {plural(ex.sets.length, 'set')}
+                      {ex.attachment && <span> · {ex.attachment}</span>}
+                      {ex.is_unilateral && <span> · Unilateral</span>}
+                    </div>
                   </div>
-                  <div className="text-xs text-slate-500">
-                    Rest: {ex.set_rest_override ?? template.default_set_rest}s
-                  </div>
+                  <span className="text-xs text-slate-500 whitespace-nowrap tabular-nums pt-0.5">
+                    {formatTime(ex.set_rest_override ?? template.default_set_rest)} rest
+                  </span>
                 </div>
               ))}
             </div>
             <div className="mt-3 text-xs text-slate-500">
-              {totalSetCount(template.exercises)} total sets · Set rest: {template.default_set_rest}s · Exercise rest: {template.default_exercise_rest}s
+              Rest {formatTime(template.default_set_rest)} between sets · {formatTime(template.default_exercise_rest)} between exercises
             </div>
           </div>
 
-          <button onClick={() => beginWorkout(template)}
-            className="w-full bg-blue-500 text-slate-950 font-black text-lg py-4 rounded-2xl hover:bg-blue-400 active:scale-98 transition-all shadow-lg shadow-blue-500/20">
-            Begin Workout
+          <button onClick={() => beginWorkout(template)} className={`${btnPrimary} w-full py-3.5 text-base`}>
+            Begin workout
           </button>
         </div>
       </PageTransition>
@@ -740,6 +746,7 @@ export default function GuidedWorkoutPage() {
     const total = totalSetCount(template.exercises)
     const done = completedSets.length
     const hasMoreExercises = exerciseIndex + 1 < template.exercises.length
+    const lastPerfForEx = lastPerf[ex.name.toLowerCase()]
 
     return (
       <PageTransition>
@@ -750,8 +757,8 @@ export default function GuidedWorkoutPage() {
           {/* Progress */}
           <div>
             <div className="flex items-center justify-between text-xs text-slate-500 mb-1.5">
-              <span>Exercise {exerciseIndex + 1} of {template.exercises.length}</span>
-              <span>{done} / {total} sets</span>
+              <span className="truncate mr-3"><span className="text-slate-300 font-medium">{template.name}</span> · Exercise {exerciseIndex + 1} of {template.exercises.length}</span>
+              <span className="tabular-nums shrink-0">{done} / {total} sets</span>
             </div>
             <div className="h-2 bg-slate-800 rounded-full overflow-hidden">
               <div className="h-full bg-blue-500 rounded-full transition-all duration-500"
@@ -761,16 +768,16 @@ export default function GuidedWorkoutPage() {
 
           {/* Parked exercises banner */}
           {skippedQueue.length > 0 && (
-            <div className="bg-amber-500/5 border border-amber-500/20 rounded-xl p-3">
-              <div className="text-xs text-amber-400/70 uppercase tracking-wide mb-2">
-                Parked — insert one next?
+            <div className="bg-slate-800/60 border border-slate-700 rounded-xl p-3">
+              <div className={`${sectionLabel} mb-2`}>
+                Saved for later — do one next?
               </div>
               <div className="flex flex-wrap gap-2">
                 {skippedQueue.map((qex, i) => (
                   <button key={i}
                     onClick={() => insertFromQueue(qex, i, exerciseIndex + 1, template, completedSets)}
-                    className="text-xs px-2.5 py-1.5 rounded-lg border border-amber-500/30 text-amber-300 hover:bg-amber-500/10 transition-colors">
-                    ↩ {qex.name}
+                    className="text-xs px-2.5 py-1.5 rounded-lg border border-slate-600 text-slate-300 hover:border-slate-400 hover:text-slate-100 transition-colors">
+                    {qex.name}
                   </button>
                 ))}
               </div>
@@ -779,17 +786,35 @@ export default function GuidedWorkoutPage() {
 
           {/* Current set card */}
           <div className={card}>
-            <div className="text-xs text-slate-500 uppercase tracking-wide mb-1">
+            <div className={`${sectionLabel} mb-1`}>
               Set {setIndex + 1} of {ex.sets.length}
             </div>
-            <h2 className="text-2xl font-black text-slate-100 mb-1 capitalize">{ex.name}</h2>
-            {ex.attachment && <div className="text-slate-500 text-xs mb-1">{ex.attachment}</div>}
-            {(s.target_weight != null || s.target_reps != null) && (
-              <div className="text-slate-400 text-sm mb-4">
-                Target: {s.target_weight != null ? `${toDisplayWeight(s.target_weight, units.weight)} ${wt}` : 'BW'}
-                {s.target_reps != null && ` × ${s.target_reps} reps`}
+            <h2 className="text-2xl font-bold text-slate-100 tracking-tight capitalize">{ex.name}</h2>
+            {ex.attachment && <div className="text-slate-500 text-xs mt-0.5">{ex.attachment}</div>}
+
+            {/* Context: what you did last time (drives the prefill) vs. what the template asks for */}
+            {(lastPerfForEx || s.target_weight != null || s.target_reps != null) && (
+              <div className="flex flex-wrap gap-2 mt-3 mb-4">
+                {lastPerfForEx && (
+                  <span className="inline-flex items-center gap-1.5 rounded-lg bg-blue-500/10 border border-blue-500/20 px-2.5 py-1 text-xs text-blue-300">
+                    <span className="text-blue-400/70">Last time</span>
+                    <span className="font-semibold tabular-nums">
+                      {formatWeight(toDisplayWeight(lastPerfForEx.weight, units.weight))} {wt} × {lastPerfForEx.reps}
+                    </span>
+                  </span>
+                )}
+                {(s.target_weight != null || s.target_reps != null) && (
+                  <span className="inline-flex items-center gap-1.5 rounded-lg bg-slate-700/40 border border-slate-700 px-2.5 py-1 text-xs text-slate-300">
+                    <span className="text-slate-500">Target</span>
+                    <span className="font-semibold tabular-nums">
+                      {s.target_weight != null ? `${formatWeight(toDisplayWeight(s.target_weight, units.weight))} ${wt}` : 'BW'}
+                      {s.target_reps != null && ` × ${s.target_reps}`}
+                    </span>
+                  </span>
+                )}
               </div>
             )}
+            {!lastPerfForEx && s.target_weight == null && s.target_reps == null && <div className="mb-4" />}
 
             {ex.is_unilateral ? (
               <div className="space-y-3 mb-3">
@@ -861,34 +886,30 @@ export default function GuidedWorkoutPage() {
             </div>
 
             <button onClick={() => logSet(phase)} className={`${btnPrimary} w-full py-3.5 text-base`}>
-              Log Set →
+              Log set
             </button>
 
-            {/* Secondary actions */}
-            <div className="flex flex-wrap gap-2 mt-3">
-              <button type="button" onClick={() => skipSet(phase)}
-                className="flex-1 min-w-[80px] py-2 rounded-xl border border-slate-700 text-slate-400 text-sm hover:border-slate-500 hover:text-slate-300 transition-colors">
-                Skip Set
+            {/* Secondary actions — deliberately quiet so "Log set" stays the obvious move */}
+            <div className="flex flex-wrap gap-x-1 gap-y-1 mt-3 -mx-1 text-sm">
+              <button type="button" onClick={() => skipSet(phase)} className={secondaryAction}>
+                Skip set
               </button>
               {hasMoreExercises && (
-                <button type="button" onClick={() => skipExerciseReturnLater(phase)}
-                  className="flex-1 min-w-[80px] py-2 rounded-xl border border-amber-500/30 text-amber-400/80 text-sm hover:bg-amber-500/10 transition-colors">
-                  ↩ Return Later
+                <button type="button" onClick={() => skipExercise(phase)} className={secondaryAction}>
+                  Skip exercise
                 </button>
               )}
               {hasMoreExercises && (
-                <button type="button" onClick={() => skipExercise(phase)}
-                  className="flex-1 min-w-[80px] py-2 rounded-xl border border-slate-700 text-slate-400 text-sm hover:border-slate-500 hover:text-slate-300 transition-colors">
-                  Skip
+                <button type="button" onClick={() => skipExerciseReturnLater(phase)} className={secondaryAction} title="Park this exercise and come back to it later">
+                  Do later
                 </button>
               )}
-              <button type="button" onClick={() => addExtraSet(phase)}
-                className="flex-1 min-w-[80px] py-2 rounded-xl border border-slate-700 text-slate-400 text-sm hover:border-slate-500 hover:text-slate-300 transition-colors">
+              <span className="flex-1" />
+              <button type="button" onClick={() => addExtraSet(phase)} className={secondaryAction}>
                 + Set
               </button>
-              <button type="button" onClick={() => setShowAddModal(true)}
-                className="flex-1 min-w-[80px] py-2 rounded-xl border border-slate-700 text-slate-400 text-sm hover:border-blue-500/40 hover:text-blue-400 transition-colors">
-                ＋ Exercise
+              <button type="button" onClick={() => setShowAddModal(true)} className={secondaryAction}>
+                + Exercise
               </button>
             </div>
           </div>
@@ -896,14 +917,14 @@ export default function GuidedWorkoutPage() {
           {/* Next up */}
           {setIndex + 1 < ex.sets.length ? (
             <div className="text-center text-xs text-slate-500">
-              Next: {ex.name} — Set {setIndex + 2} · Rest {ex.set_rest_override ?? template.default_set_rest}s after this set
+              Up next: set {setIndex + 2} of {ex.sets.length} · {formatTime(ex.set_rest_override ?? template.default_set_rest)} rest
             </div>
           ) : hasMoreExercises ? (
             <div className="text-center text-xs text-slate-500">
-              Next exercise: {template.exercises[exerciseIndex + 1].name} · Rest {ex.exercise_rest_override ?? template.default_exercise_rest}s after this set
+              Up next: {template.exercises[exerciseIndex + 1].name} · {formatTime(ex.exercise_rest_override ?? template.default_exercise_rest)} rest
             </div>
           ) : (
-            <div className="text-center text-xs text-slate-500">Last set — almost done!</div>
+            <div className="text-center text-xs text-slate-500">Last set of the workout</div>
           )}
 
           {/* Exit workout */}
@@ -924,7 +945,7 @@ export default function GuidedWorkoutPage() {
         <ExitModal />
         <div className="max-w-xl mx-auto space-y-4">
           <div className={card}>
-            <h2 className="text-xl font-black text-slate-100 text-center mb-6">Rest</h2>
+            <h2 className="text-xl font-bold text-slate-100 text-center mb-6">Rest</h2>
             <RestTimer
               phase={phase}
               onDone={() => afterRest(phase)}
@@ -935,8 +956,8 @@ export default function GuidedWorkoutPage() {
             {/* Parked exercises — offer to insert next during rest */}
             {skippedQueue.length > 0 && (
               <div className="mt-5 pt-4 border-t border-slate-700">
-                <div className="text-xs text-amber-400/70 uppercase tracking-wide mb-3">
-                  Machine free? Insert next:
+                <div className={`${sectionLabel} mb-3`}>
+                  Saved for later — do one next?
                 </div>
                 <div className="space-y-2">
                   {skippedQueue.map((qex, i) => (
@@ -944,8 +965,8 @@ export default function GuidedWorkoutPage() {
                       <span className="text-slate-300 text-sm">{qex.name}</span>
                       <button
                         onClick={() => insertFromQueue(qex, i, phase.nextExerciseIndex, phase.template, phase.completedSets)}
-                        className="shrink-0 text-xs px-3 py-1.5 rounded-lg border border-amber-500/30 text-amber-300 hover:bg-amber-500/10 transition-colors">
-                        Do Next
+                        className="shrink-0 text-xs px-3 py-1.5 rounded-lg border border-slate-600 text-slate-300 hover:border-slate-400 hover:text-slate-100 transition-colors">
+                        Do next
                       </button>
                     </div>
                   ))}
@@ -976,13 +997,12 @@ export default function GuidedWorkoutPage() {
       <PageTransition>
         <div className="space-y-6 max-w-xl mx-auto">
           <div className="text-center">
-            <div className="text-4xl mb-2">🎉</div>
-            <h1 className="text-2xl font-black text-slate-100">Workout Complete!</h1>
-            <p className="text-slate-400 text-sm mt-1">{completedSets.length} sets logged</p>
+            <h1 className={pageTitle}>Workout complete</h1>
+            <p className="text-slate-400 text-sm mt-1">{plural(completedSets.length, 'set')} logged · review, then save to your history</p>
           </div>
 
           <div className={card}>
-            <h2 className="font-semibold text-slate-200 mb-3">Results</h2>
+            <h2 className={`${cardTitle} mb-3`}>Results</h2>
             <div className="space-y-4">
               {Object.entries(grouped).map(([exIdxStr, sets]) => (
                 <div key={exIdxStr}>
@@ -991,11 +1011,11 @@ export default function GuidedWorkoutPage() {
                     {sets.map((cs, i) => (
                       <div key={i} className="grid grid-cols-[32px_1fr_1fr] gap-2 text-sm">
                         <span className="text-slate-500 text-center">{cs.setNumber}</span>
-                        <span className="text-slate-200">
-                          {cs.actualWeight != null ? `${toDisplayWeight(cs.actualWeight, units.weight)} ${wt}` : 'BW'}
+                        <span className="text-slate-200 tabular-nums">
+                          {cs.actualWeight != null ? `${formatWeight(toDisplayWeight(cs.actualWeight, units.weight))} ${wt}` : 'BW'}
                           {cs.targetWeight != null && cs.actualWeight !== cs.targetWeight && (
                             <span className="text-slate-600 text-xs ml-1">
-                              (target: {toDisplayWeight(cs.targetWeight, units.weight)})
+                              (target {formatWeight(toDisplayWeight(cs.targetWeight, units.weight))})
                             </span>
                           )}
                         </span>
@@ -1014,7 +1034,7 @@ export default function GuidedWorkoutPage() {
           </div>
 
           <div className={card}>
-            <h2 className="font-semibold text-slate-200 mb-3">Save to workout log</h2>
+            <h2 className={`${cardTitle} mb-3`}>Save to workout log</h2>
             <div className="space-y-3 mb-4">
               <div>
                 <label className="block text-xs text-slate-500 uppercase tracking-wide mb-1.5">Workout Name</label>
@@ -1029,7 +1049,7 @@ export default function GuidedWorkoutPage() {
             </div>
             {savingError && <p className="text-red-400 text-sm mb-3">{savingError}</p>}
             <button onClick={() => saveWorkout(phase)} className={`${btnPrimary} w-full py-3`}>
-              Save Workout
+              Save workout
             </button>
             <button onClick={() => { draftClearedRef.current = true; localStorage.removeItem(GUIDED_DRAFT_KEY); navigate('/templates') }}
               className="w-full text-slate-500 hover:text-slate-300 text-sm mt-3 transition-colors">

@@ -1,53 +1,45 @@
-# GymTrackerCLI
+# GymTracker
 
-Full-stack fitness tracker: strength workouts, cardio, body measurements, PR trends, workout templates, and guided set-by-set walkthroughs with rest timers.
-
-**Live demo:** https://gym-tracker-lemon-five.vercel.app
-
-Click **Try Demo** — no account or credentials needed.
+A full-stack strength and cardio training tracker with historical analytics, workout templates, and resumable guided workouts. Built to replace two years of plain-text gym notes with something that shows progress.
 
 ## Live demo
 
-The demo runs against a real Postgres dataset (~300 workouts, ~2,000 exercises, ~6,400 sets, spanning 2024–2026, plus workout templates and cardio sessions). Backend on Railway (FastAPI + PostgreSQL), frontend on Vercel.
+**https://gym-tracker-lemon-five.vercel.app** → **Try the demo**. No sign-up.
 
-60-second walkthrough:
-1. Click **Try Demo**
-2. Land on the Dashboard — summary stats + recent workouts
-3. Open Workouts — paginated list
-4. Open a workout — view exercises and sets
-5. Open Analytics — volume + trend charts
-6. Open PRs — all-time PR per exercise
-7. Open Templates
-8. Start a guided workout from a template
-9. Note the prefilled weight/reps (from prior performance, not just the template target)
-10. Log a set
-11. Navigate away mid-workout
-12. Return via the Resume card
-13. Refresh the page — the workout resumes from where it left off
+Every visitor gets a private sandbox cloned from a real two-year training history: 308 workouts, 2,030 exercises, 6,568 sets, and 2 workout templates. Changes are yours alone and expire after 24 hours.
+
+Suggested 60-second walkthrough:
+
+1. **Dashboard** – lifetime totals and recent sessions
+2. **Workouts** – full history grouped by month; open any session to see its sets
+3. **PRs** – all-time max per exercise, tap one for its progression chart
+4. **Templates** – pick one and **Start workout**
+5. **Guided workout** – each set is pre-filled from your last performance ("Last time" vs "Target"); log a set and the rest timer starts
+6. Navigate away, then come back via **Log Workout → Resume**, or hard-refresh the page. The session picks up exactly where it stopped.
+7. **Exit demo** from the top-right
 
 ## Features
 
-- Strength workout logging: nested exercises and sets, unilateral (left/right) and timed (duration) exercise types
-- Guided set-by-set walkthroughs with rest timers, driven by workout templates
-- Cardio session logging with structured segments (distance, duration, pace, HR, reps)
-- Body measurement tracking
-- PR trends and running max history per exercise
-- Volume and trend analytics, side-by-side workout comparison
-- Workout templates with per-set targets and rest overrides
-- Per-dimension unit preferences (weight, distance, body measurements, temperature)
-- Admin-curated global exercise library with wger.de / ExerciseDB lookups
-- Self-contained recruiter demo mode (see below)
+- Strength logging with nested exercises and sets, including unilateral (left/right) and timed exercises
+- Guided set-by-set workouts driven by templates, with rest timers and history-based prefill
+- In-progress workouts persist to `localStorage` and resume after navigation or refresh
+- All-time PRs and running-max progression per exercise
+- Volume, exercise-trend, body-measurement, and cardio analytics; side-by-side workout comparison
+- Workout templates with per-set targets and per-exercise rest overrides
+- Cardio sessions with structured segments (distance, duration, pace, heart rate)
+- Per-dimension unit preferences (lbs/kg, km/mi, cm/in, °C/°F)
+- Per-visitor recruiter demo sandboxes (see below)
 
 ## Architecture
 
-| Layer | Tools |
-|-------|-------|
-| Backend | FastAPI, SQLAlchemy 2.0, Pydantic 2, python-jose (JWT HS256, 7-day), bcrypt, httpx, Uvicorn |
-| Database | SQLite (dev) → PostgreSQL (Railway prod) |
-| Frontend | React 19, TypeScript 5.9, Vite 8, Tailwind CSS v4, React Router v7, Axios, Framer Motion, Recharts |
-| Deploy | Railway (backend + Postgres), Vercel (frontend SPA), Resend (email, optional) |
+```
+React 19 + TypeScript (Vite)  ──HTTPS/JSON──▶  FastAPI  ──SQLAlchemy 2.0──▶  PostgreSQL
+        Vercel                                  Railway                       Railway
+```
 
-The backend is a conventional FastAPI app: routers handle HTTP concerns only and delegate to a `services/` layer for business logic, with SQLAlchemy models shared across both. The frontend is a single-page React app behind JWT auth, with typed Axios wrappers per resource and a shared `AuthContext` for session and unit-preference state. There is no separate job queue or cache layer — periodic work (like demo sandbox cleanup) rides in as a FastAPI background task on the next relevant request.
+- **Backend:** FastAPI routers handle HTTP only and delegate to a `services/` layer. JWT (HS256) auth, bcrypt passwords, Pydantic 2 schemas. SQLite for local dev, PostgreSQL in production. Schema changes are applied at startup by `create_all` plus a small list of idempotent `ALTER TABLE` migrations.
+- **Frontend:** single-page app behind a `ProtectedRoute`, typed Axios wrappers per resource, a shared `AuthContext` for session and unit preferences, Tailwind v4 with a small set of shared style tokens, Recharts for charts.
+- **Deploy:** push to `main` deploys the API to Railway and the SPA to Vercel.
 
 ## Data model
 
@@ -55,105 +47,98 @@ The backend is a conventional FastAPI app: routers handle HTTP concerns only and
 User
 ├── Workout (name, date)
 │   └── Exercise (name, order_index, is_unilateral, is_timed, attachment)
-│       └── Set (weight, reps, rpe, set_number,
-│               weight_right, reps_right,  ← unilateral only
-│               duration)                  ← timed only
-├── Measurement (weight, body_fat, chest, waist, hips, arms, thighs, neck — nullable)
-├── CardioSession → CardioSegment[] (sort_order, type, distance, duration, pace, hr, reps)
-└── WorkoutTemplate → TemplateExercise[] → TemplateSet[]
-    WorkoutTemplate has: default_set_rest, default_exercise_rest
-    TemplateExercise has: set_rest_override, exercise_rest_override, is_unilateral, attachment
+│       └── Set (set_number, weight, reps, rpe,
+│               weight_right, reps_right,   ← unilateral only
+│               duration)                   ← timed only
+├── WorkoutTemplate (default_set_rest, default_exercise_rest)
+│   └── TemplateExercise (order, rest overrides, is_unilateral)
+│       └── TemplateSet (target_weight, target_reps)
+├── CardioSession → CardioSegment[] (type, distance, duration, pace, hr)
+└── Measurement (weight, body_fat, chest, waist, hips, arms, thighs, neck)
 ```
 
-Exercise types: Normal (weight + reps), Unilateral (weight_right/reps_right tracked separately per side), Timed (duration in seconds, no weight/reps).
+Shared tables: `GlobalExercise` (curated exercise library), `ExerciseCache` (30-day cache of wger.de muscle lookups), `PasswordResetToken` (hashed, single-use).
 
-Shared/support tables: `GlobalExercise` (admin-curated library, shared across users), `ExerciseCache` (30-day TTL cache of wger.de lookups), `PasswordResetToken` (SHA-256 hashed, one-time use).
+## Guided workout
 
-## Guided workout state machine
-
-`GuidedWorkoutPage` is a discriminated union driven by a single `setPhase(...)`:
+`GuidedWorkoutPage` is a state machine over a discriminated union, with every transition going through one `setPhase` call:
 
 ```
 loading → ready → active ⇄ resting → summary → saving
 ```
 
-- `active` holds the current exercise/set index, accumulated `completedSets`, and the in-progress input fields (weight, reps, RPE, and right-side variants for unilateral exercises)
-- `resting` runs the rest timer between sets or exercises, then hands control back to `active` at the next position
-- `summary` is reached once every set is logged, before the workout is POSTed
-- A resume card on `/log` and on a template's guided page offers to continue an in-progress draft found in `localStorage`
+- **Previous performance:** before the session starts, one request fetches the last logged weight and reps for every exercise in the template. Each set's inputs are pre-filled from that, falling back to the template target only when there is no history. The UI shows both values so the user can see why the number is what it is.
+- **Persistence:** the draft is written to `localStorage` on every phase change, on route change, and on `beforeunload`. It is cleared only by an explicit action (save or discard), so a stale draft can never overwrite a finished session.
+- **Resume:** a resume card appears on the log page and on the template's start screen whenever a draft exists; the rest timer is not resumable, so a draft saved mid-rest restores to the next set instead.
 
-## Previous-performance prefill and persistence
+## Recruiter demo architecture
 
-Each set's starting weight/reps prefers the user's own last logged performance for that exercise name over the template's target — the target is only a fallback when no prior performance exists.
+```
+owner's real account  ──snapshot (admin only)──▶  sanitized template user  ──clone per visitor──▶  sandbox user (24 h)
+```
 
-The in-progress draft is written to `localStorage` on every state change, on navigation away, and on `beforeunload`, so a hard refresh or an accidental tab close doesn't lose progress. The draft is cleared only on an intentional action (saving and navigating away, or explicit "Discard") to avoid a stale draft overwriting a completed session.
+- The template is built server-side from the caller's own account, never from a client-supplied id. Sanitization drops credentials, reset tokens, body measurements, and free-text notes, and reduces session names to their training-split label.
+- Each "Try the demo" clones the template inside a single transaction: one bulk `INSERT … RETURNING` per table, with explicit old-id → new-id maps to rewrite every foreign key. Any failure rolls the whole clone back.
+- Sandbox dates are shifted so the most recent workout is always "yesterday". Sandboxes get a normal 24-hour JWT, cannot log in with a password, and are deleted on the next provisioning call once expired. Cleanup is restricted to `demo_role = 'sandbox'` rows, so it can never touch a real account or the template.
 
-## Analytics and PRs
+## Engineering highlights
 
-- `pr_service.py` computes all-time PRs (max weight) per exercise in a single query with a subquery join, and running max history over time per exercise — written to avoid the PostgreSQL `GROUP BY` strictness that SQLite tolerates but Postgres rejects, and to replace a per-exercise N+1 query pattern.
-- `stats_service.py` computes total volume (weight × reps) per session and per-session trends (max weight + volume) using SQL `SUM`/aggregate queries rather than pulling every set into Python.
-
-## Historical data import pipeline
-
-A one-time, three-step offline pipeline (`scripts/`) used to backfill the account's real training history from raw text notes:
-
-1. `parse_workouts.py` — parses `workouts_raw.txt` into `workouts_parsed.json` (for manual unit review) and fuzzy-matches raw exercise names against the `GlobalExercise` library into `exercise_mapping.json` (for manual correction)
-2. Manual review of both JSON files
-3. `import_workouts.py` — POSTs the approved, mapped workouts to the API (`--dry-run` supported before a real import)
-
-Not part of the running app; kept for reference and any future re-imports.
-
-## Demo architecture
-
-The owner's real account is snapshotted once, server-side, into a protected, read-only "demo template" user via an admin-only endpoint — the snapshot always sources from the caller's own account, so no user id is ever accepted from a client. Sanitization on snapshot: no credentials or password-reset tokens, no body measurements, no free-text notes, workout names reduced to their training-split label, neutral identity.
-
-Every "Try Demo" click clones the template into a disposable sandbox user: a bulk `INSERT ... RETURNING` per table with explicit old-id → new-id maps, inside one transaction, rolled back on any failure. A normal 24-hour JWT is issued for the new sandbox. Expired sandboxes are deleted on the next provisioning call, and deletion is guarded to `demo_role='sandbox'` rows only — it can never touch a real account or the template. Sandbox dates are shifted uniformly so the most recent workout lands on yesterday, keeping the dashboard's "recent" views looking live. Provisioning measured ~50 ms on SQLite locally, sub-second on Postgres. Demo users cannot log in with a password or reset one.
+- ~8,600 relational rows cloned per demo visitor in ~0.65 s on Railway PostgreSQL, with full foreign-key remapping and transactional rollback
+- PRs computed in a single query with a subquery join (replacing a per-exercise N+1 pattern), written to satisfy PostgreSQL's strict `GROUP BY` rules that SQLite silently tolerates
+- Dashboard and volume analytics aggregate in SQL rather than pulling every set into Python; the dashboard endpoint replaced two full-table fetches
+- Guided workout state persists through navigation and hard refresh with no server round-trip
+- Analytics and PR trends run over 300+ real sessions, not seeded fixtures
 
 ## Tech stack
 
-See the Architecture table above. Full breakdown in [claude.md](claude.md).
+| Layer | Tools |
+|-------|-------|
+| Backend | Python 3, FastAPI, SQLAlchemy 2.0, Pydantic 2, python-jose (JWT), bcrypt, httpx, Uvicorn |
+| Database | PostgreSQL (production), SQLite (development) |
+| Frontend | React 19, TypeScript 5.9, Vite 8, Tailwind CSS v4, React Router v7, Axios, Framer Motion, Recharts |
+| Infrastructure | Railway (API + Postgres), Vercel (SPA), Resend (transactional email, optional) |
 
-## Deployment
+## Running locally
 
 ```bash
-cd frontend && npm run build   # outputs frontend/dist/
+# Backend (http://localhost:8000) — uses ./data/gym.db by default
+python -m venv venv && source venv/bin/activate
+pip install -r requirements.txt
+uvicorn api.main:app --reload
+
+# Frontend (http://localhost:5173) — proxies API paths to :8000
+cd frontend
+npm install
+npm run dev
 ```
 
-| Variable | Where | Description |
-|----------|-------|-------------|
-| `DATABASE_URL` | Railway | PostgreSQL URL (`postgres://` auto-converted) |
-| `SECRET_KEY` | Railway | JWT signing key |
-| `ADMIN_USERNAME` | Railway | Username granted `is_admin` |
-| `ALLOWED_ORIGINS` | Railway | Comma-separated CORS origins |
-| `FRONTEND_URL` | Railway | Base URL for password reset emails |
-| `RESEND_API_KEY` | Railway | Email API key (optional; silent if unset) |
-| `FROM_EMAIL` | Railway | Sender address |
-| `RAPIDAPI_KEY` | Railway | ExerciseDB API key (admin search endpoint) |
-| `VITE_API_URL` | Vercel | Backend URL (unset = use Vite dev proxy) |
+Environment variables (all optional in development):
 
-## Local setup
+| Variable | Purpose |
+|----------|---------|
+| `DATABASE_URL` | SQLAlchemy URL; `postgres://` is rewritten to `postgresql://` |
+| `SECRET_KEY` | JWT signing key |
+| `ADMIN_USERNAME` | Account granted admin rights at startup |
+| `ALLOWED_ORIGINS` | Comma-separated CORS origins |
+| `FRONTEND_URL`, `RESEND_API_KEY`, `FROM_EMAIL` | Password-reset email (silent if unset) |
+| `VITE_API_URL` | Frontend build-time API base URL (unset = Vite dev proxy) |
+
+To build a demo template from your own admin account: `python scripts/refresh_demo_template.py --api <API_URL> --token <ADMIN_JWT>`.
+
+The `scripts/` directory also holds the one-off pipeline that imported the original plain-text training notes (`parse_workouts.py` → manual review → `import_workouts.py --dry-run`) and the exercise-library seeder.
+
+## Tests
 
 ```bash
-# Backend
-pip install -r requirements.txt
-uvicorn api.main:app --reload        # localhost:8000
-
-# Frontend
-cd frontend && npm install
-npm run dev                           # localhost:5173
-npm run build                         # tsc + vite build
-npm run lint
-
-# Tests
 python -m pytest tests -q
 ```
 
-Tests cover the demo feature end to end (14 tests): sandbox provisioning, id remapping across cloned tables, source-account isolation, cross-user access, login blocked for demo users, the per-IP rate limit, guarded cleanup (real accounts untouchable), and transaction rollback on failure.
-
-Vite proxies `/auth`, `/workouts`, `/stats`, `/exercises`, `/library`, `/measurements`, `/cardio`, `/health` to `:8000` in dev. `/templates` is not proxied by default.
-
-To refresh the demo template from your own account (admin only):
+14 tests cover the demo feature end to end: sandbox provisioning, id remapping across every cloned table, source-account isolation, cross-user access, login blocked for demo users, per-IP rate limiting, guarded cleanup, and rollback on failure.
 
 ```bash
-python scripts/refresh_demo_template.py --api <API_URL> --token <ADMIN_JWT>
+cd frontend && npm run build   # type-check + production build
 ```
+
+## License
+
+MIT
